@@ -7,7 +7,7 @@ base_router = APIRouter(
 )
 
 @base_router.get('/')
-def home():
+async def home():
     app_name = os.getenv("APP_NAME")
     app_version = os.getenv("APP_VERSION")
 
