@@ -12,11 +12,11 @@ An intelligent RAG-based assistant for social insurance and pension information,
 1) Download and install MiniConda from [here](https://docs.anaconda.com/free/miniconda/#quick-command-line-install)
 2) Create a new environment using the following command:
 ```bash
-$ conda create -n mini-rag python=3.11
+$ conda create -n insurance-rag python=3.11
 ```
 3) Activate the environment:
 ```bash
-$ conda activate mini-rag
+$ conda activate insurance-rag
 ```
 
 ### (Optional) Setup you command line interface for better readability
