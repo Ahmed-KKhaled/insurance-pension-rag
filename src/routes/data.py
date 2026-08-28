@@ -1,6 +1,7 @@
 from fastapi import FastAPI, APIRouter, Depends, Uploadfile
 import os
 from helpers.config import get_settings, Settings
+from controllers.DataController import DataController
 
 data_router = APIRouter(
     prefix="/api/v1/data",
@@ -13,4 +14,5 @@ async def upload_data(project_id: str, file: Uploadfile,
 
 
     # validate the file extensions
+    data_controller = DataController()
     
