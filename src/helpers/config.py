@@ -9,6 +9,9 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str
 
+    FILE_ALLOWED_EXTENSIONS: list
+    FILE_MAX_SIZE: int
+
     class Config:
         env_file=".env"
 
