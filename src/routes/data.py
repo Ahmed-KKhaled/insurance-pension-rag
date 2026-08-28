@@ -12,4 +12,5 @@ async def upload_data(project_id: str, file: Uploadfile,
                       app_settings: Settings = Depends(get_settings)):
 
 
+    # validate the file extensions
     
