@@ -9,3 +9,4 @@ class ResponseSignal(Enum):
     FILE_UPLOADED_SUCCESS = 'file uploaded success'
     FILE_UPLOADED_FAIL = 'file uploaded fail'
     
+    
