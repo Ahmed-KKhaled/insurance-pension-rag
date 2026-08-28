@@ -1,9 +1,9 @@
 from .BaseController import BaseController
 from .ProjectController import ProjectController
-import os
 from fastapi import UploadFile
 from models import ResponseSignal
-
+import os
+import re
 
 class DataController(BaseController):
 
@@ -12,7 +12,7 @@ class DataController(BaseController):
         self.size_scale = 1048576 # convert MB to bytes
 
 
-    def validate_uploaded_file(self, file: UploadFile) -> bool:
+    def validate_uploaded_file(self, file: UploadFile):
 
         if file.content_type not in self.app_settings.FILE_ALLOWED_EXTENSIONS:
             return False, ResponseSignal.FILE_TYPE_NOT_SUPPORTED.value
@@ -43,6 +43,17 @@ class DataController(BaseController):
                 random_key + "_" + cleaned_file_name
             )
 
-        return new_file_path, random_key + "_" + cleaned_file_name
+        return new_file_path
+
+
+    def get_clean_file_name(self, orig_file_name: str):
+
+        # remove any special characters, except underscore and .
+        cleaned_file_name = re.sub(r'[^\w.]', '', orig_file_name.strip())
+
+        # replace spaces with underscore
+        cleaned_file_name = cleaned_file_name.replace(" ", "_")
+
+        return cleaned_file_name
 
 
