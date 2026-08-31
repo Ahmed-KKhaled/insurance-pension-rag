@@ -2,8 +2,9 @@ from fastapi import FastAPI, APIRouter, Depends, UploadFile, status
 from fastapi.responses import JSONResponse
 import os
 from helpers.config import get_settings, Settings
-from controllers import DataController, ProjectController
+from controllers import DataController, ProjectController, ProcessController
 from models import ResponseSignal
+from .schemes import ProcessRequest
 import aiofiles
 import logging
 
@@ -34,7 +35,7 @@ async def upload_data(project_id: str, file: UploadFile,
 
     project_controller = ProjectController()
     project_dir_path = project_controller.get_project_path(project_id=project_id)
-    file_path = data_controller.generate_unique_filepath(
+    file_path, file_id = data_controller.generate_unique_filepath(
         orig_file_name=file.filename,
         project_id=project_id
     )
@@ -59,11 +60,43 @@ async def upload_data(project_id: str, file: UploadFile,
 
     return JSONResponse(
                 content = {
-                    "signal": ResponseSignal.FILE_UPLOADED_SUCCESS.value
+                    "signal": ResponseSignal.FILE_UPLOADED_SUCCESS.value,
+                    "file_id" : file_id
                 }
             )
 
-    
+
+@data_router.post("/process/{project_id}")
+async def process_endpoint(project_id: str, process_request: ProcessRequest):
+
+     file_id = process_request.file_id
+     process_controller = ProcessController(project_id=project_id)
+
+     file_chunks = process_controller.process_file_content(
+          file_id=file_id,
+          chunk_size=process_request.chunk_size,
+          overlap_size=process_request.overlap_size
+     )
+
+     if file_chunks is None or len(file_chunks) == 0:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content = {
+                "signal": ResponseSignal.FILE_PROCESSED_FAIL.value
+            }
+        )
+          
+
+     return JSONResponse(
+            content = {
+                "signal": ResponseSignal.FILE_PROCESSED_SUCCESS.value,
+                "number_of_chunk" : len(file_chunks)
+            }
+        )
+
+
+   
+
 
 
 
