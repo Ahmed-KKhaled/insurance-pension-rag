@@ -14,3 +14,5 @@ class ProcessController(BaseController):
         file_ext = os.path.splitext(file_id)[-1]
 
         return file_ext
+
+    
