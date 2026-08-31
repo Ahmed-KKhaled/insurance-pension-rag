@@ -4,6 +4,7 @@ import os
 from helpers.config import get_settings, Settings
 from controllers import DataController, ProjectController
 from models import ResponseSignal
+from schemes import ProcessRequest
 import aiofiles
 import logging
 
@@ -64,6 +65,13 @@ async def upload_data(project_id: str, file: UploadFile,
                 }
             )
 
+
+@data_router.post("/process/{project_id}")
+async def process_endpoint(project_id: str, process_request: ProcessRequest):
+     
+    file_id = process_request.file_id
+
+    return file_id
 
 
 
