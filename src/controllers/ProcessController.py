@@ -5,6 +5,7 @@ from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from models import ProcessingEnum
+import logging
 
 class ProcessController(BaseController):
     def __init__(self, project_id: str):
@@ -12,6 +13,7 @@ class ProcessController(BaseController):
 
         self.project_id = project_id
         self.project_path = ProjectController().get_project_path(project_id=project_id)
+        self.logger = logging.getLogger(__name__)
 
 
     def get_file_extension(self, file_id: str):
@@ -27,6 +29,9 @@ class ProcessController(BaseController):
             file_id
         )
 
+        if not os.path.exists(file_path):
+            return None
+
         if file_ext == ProcessingEnum.TXT.value:
             return TextLoader(file_path, encoding="utf-8")
 
@@ -39,7 +44,10 @@ class ProcessController(BaseController):
 
         loader = self.get_file_loader(file_id=file_id)
 
-        return loader.load()
+        if loader:
+         return loader.load()
+
+        return None
 
 
     def process_file_content(self, file_id: str,
@@ -51,6 +59,10 @@ class ProcessController(BaseController):
             chunk_overlap = overlap_size
         )
         file_content = self.get_file_content(file_id=file_id)
+
+        if file_content is None:
+            self.logger.error(f"Error While processing {file_id}")
+            return None
 
         file_content_texts = [rec.page_content for rec in file_content]
 
