@@ -4,6 +4,8 @@ class LLMEnums(Enum):
     
     OPENAI = "OPENAI"
     COHERE = "COHERE"
+    HUGGINGFACE = "HUGGINGFACE"
+    SENTENCE_TRANSFORMER = "SENTENCE_TRANSFORMER" 
 
 
 class OpenAIEnums(Enum):
