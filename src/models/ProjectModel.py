@@ -30,11 +30,11 @@ class ProjectModel(BaseDataModel):
                    )
               
 
-    async def create_project(self, project: Project):
+    async def insert_project(self, project: Project):
 
         # mongodb store info in dict format key, value
         result = await self.collection.insert_one(project.dict(by_alias=True, exclude_unset=True))
-        project._id = result.inserted_id
+        project.id = result.inserted_id
 
         return project
 
@@ -46,7 +46,7 @@ class ProjectModel(BaseDataModel):
 
             if record is None:
                 project = Project(project_id=project_id)
-                project = await self.create_project(project=project)
+                project = await self.insert_project(project=project)
 
                 return project
 
