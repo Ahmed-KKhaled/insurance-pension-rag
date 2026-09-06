@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-class LLMinterface(ABC):
+class LLMInterface(ABC):
 
 
     @abstractmethod
@@ -29,7 +29,7 @@ class LLMinterface(ABC):
                          prompt: str,
                          role: str):
         pass
-    
+
 
     
 
