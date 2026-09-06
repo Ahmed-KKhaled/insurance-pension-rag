@@ -65,6 +65,32 @@ class QdrantProvider(VectorDBInterface):
             return True
         
         return False
+
+    def insert_one(self, collection_name: str, text: str, vector: list,
+                         metadata: dict = None, 
+                         record_id: str = None):
+        
+        if not self.is_collection_existed(collection_name):
+            self.logger.error(f"Can not insert new record to non-existed collection: {collection_name}")
+            return False
+        
+        try:
+            _ = self.client.upload_records(
+                collection_name=collection_name,
+                records=[
+                    models.Record(
+                        vector=vector,
+                        payload={
+                            "text": text, "metadata": metadata
+                        }
+                    )
+                ]
+            )
+        except Exception as e:
+            self.logger.error(f"Error while inserting batch: {e}")
+            return False
+
+        return True
     
         
 
