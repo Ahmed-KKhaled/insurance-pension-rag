@@ -6,7 +6,7 @@ from typing import List
 
 class QdrantProvider(VectorDBInterface):
 
-    def __int__(self, db_path: str,
+    def __init__(self, db_path: str,
                       distance_method: str):
 
 
@@ -104,11 +104,10 @@ class QdrantProvider(VectorDBInterface):
             record_ids = [None] * len(texts)
 
         for i in range(0, len(texts), batch_size):
-            batch_end = i + batch_size
 
-            batch_texts = texts[i:batch_end]
-            batch_vectors = vectors[i:batch_end]
-            batch_metadata = metadata[i:batch_end]
+            batch_texts = texts[i : i + batch_size]
+            batch_vectors = vectors[i : i + batch_size]
+            batch_metadata = metadata[i : i + batch_size]
 
             batch_records = [
                 models.Record(
