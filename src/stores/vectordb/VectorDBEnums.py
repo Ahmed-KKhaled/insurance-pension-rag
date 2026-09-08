@@ -8,3 +8,4 @@ class VectorDBEnums(Enum):
 class DistanceMethodEnums(Enum):
     COSINE = "cosine"
     DOT = "dot"
+    IP = "ip"

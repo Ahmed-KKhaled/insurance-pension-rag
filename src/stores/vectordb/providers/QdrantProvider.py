@@ -1,6 +1,7 @@
 from qdrant_client import models, QdrantClient
 from ..VectorDBInterface import VectorDBInterface
 from ..VectorDBEnums import DistanceMethodEnums
+from models.db_schemes import RetrievedDocument
 import logging
 from typing import List
 
@@ -39,9 +40,15 @@ class QdrantProvider(VectorDBInterface):
         return self.client.get_collections()
 
     def get_collection_info(self, collection_name: str) -> dict:
-        return self.client.get_collection(
+        info = self.client.get_collection(
             collection_name=collection_name
         )
+
+        return {
+            "status": info.status,
+            "points_count": info.points_count,
+            "indexed_vectors_count": info.indexed_vectors_count,
+        }
 
     def delete_collection(self, collection_name: str):
         if self.is_collection_existed(collection_name=collection_name):
@@ -79,7 +86,7 @@ class QdrantProvider(VectorDBInterface):
                 collection_name=collection_name,
                 records=[
                     models.PointStruct(
-                        id = [record_id],
+                        id = record_id,
                         vector=vector,
                         payload={
                             "text": text, "metadata": metadata
@@ -141,17 +148,27 @@ class QdrantProvider(VectorDBInterface):
 
         return True
 
-    def search_by_vector(self, collection_name: str, vector: list, limit: int = 5):
+    def search_by_vector(self, collection_name: str, vector: list, limit: int = 5) -> List[RetrievedDocument]:
 
-        vector = vector[0]
+        if vector and isinstance(vector[0], list):
+            vector = vector[0]
 
-        response = self.client.query_points(
+        responses = self.client.query_points(
             collection_name=collection_name,
             query=vector,
             limit=limit
         )
 
-        return response.points
+        if not responses.points:
+            return None
+
+        return [
+            RetrievedDocument(**{
+                "score": point.score,
+                "text": point.payload.get("text") if point.payload else None
+            })
+            for point in responses.points
+        ]
 
     
     

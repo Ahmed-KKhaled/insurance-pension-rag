@@ -2,18 +2,22 @@ from .BaseController import BaseController
 from models import Project, DataChunk
 from typing import List
 from stores.llm.LLMEnums import DocumentTypeEnum
+import logging
 
 class NLPController(BaseController):
 
     def __init__(self, vectordb_client, 
                        generation_client,
-                       embedding_client):
+                       embedding_client,
+                       template_parser):
         
         super().__init__()
 
         self.vectordb_client = vectordb_client
         self.generation_client = generation_client
         self.embedding_client = embedding_client
+        self.template_parser = template_parser
+        self.logger = logging.getLogger("uvicorn")
 
 
     def create_collection_name(self, project_id: str):
@@ -60,6 +64,13 @@ class NLPController(BaseController):
             for text in texts
         ]
 
+        if any(vector is None for vector in vectors):
+            self.logger.error(
+                "Embedding failed for one or more chunks — check the "
+                "embedding backend/API key before indexing."
+            )
+            return False
+
         # 3) create collection if not exists
         _ = self.vectordb_client.create_collection(
             collection_name=collection_name,
@@ -69,14 +80,14 @@ class NLPController(BaseController):
 
 
         # 4) insert into vector db
-        _ = self.vectordb_client.insert_many(
+        is_inserted = self.vectordb_client.insert_many(
             collection_name=collection_name,
             texts=texts,
             vectors=vectors,
             metadata=metadata,
         )
 
-        return True
+        return is_inserted
 
 
     def search_vector_db_collection(self, project: Project, text: str, limit: int = 10):
@@ -87,6 +98,7 @@ class NLPController(BaseController):
         # step2: get text embedding vector
         vector = self.embedding_client.embed_text(text=text, 
                                                  document_type=DocumentTypeEnum.QUERY.value)
+
 
         if not vector or len(vector) == 0:
             return False
@@ -102,6 +114,73 @@ class NLPController(BaseController):
             return False
 
         return results
+
+
+    def answer_rag_questions(self, project: Project, query: str, limit: int=10):
+
+
+        answer, full_prompt, chat_history = None, None, None
+
+        # 1) retrieve related documents
+        retrieved_documents = self.search_vector_db_collection(
+            project=project,
+            text=query,
+            limit=limit
+        )
+
+        if not retrieved_documents or len(retrieved_documents) == 0:
+            return answer, full_prompt, chat_history
+
+        # 2) construct the llm prompt
+        system_prompt = self.template_parser.get(
+            group="rag",
+            key="system_prompt",
+        )
+
+
+
+        documents_prompts = "\n".join([self.template_parser.get(
+            group="rag",
+            key="document_prompt",
+            vars={
+                "doc_num":idx + 1,
+                "chunk_text": doc.text
+            }
+        )  for idx, doc in  enumerate(retrieved_documents)])
+
+        footer_prompt = self.template_parser.get(
+            group="rag",
+            key="footer_prompt"
+        )
+
+        chat_history = [
+            self.generation_client.construct_prompt(
+                prompt=system_prompt,
+                role=self.generation_client.enums.SYSTEM.value
+
+            )
+        ]
+
+        full_prompt = "\n\n".join([
+            documents_prompts,
+            footer_prompt
+        ])
+
+
+        answer = self.generation_client.generate_text(
+            prompt=full_prompt,
+            chat_history=chat_history,
+
+        )
+
+        return answer, full_prompt, chat_history
+
+        
+
+
+
+        
+
 
 
 

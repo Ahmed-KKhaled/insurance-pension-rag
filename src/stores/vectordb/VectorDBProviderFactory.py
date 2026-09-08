@@ -1,4 +1,4 @@
-from .providers.QdrantProvider import QdrantProvider
+from .providers import QdrantProvider, ChromaDBProvider
 from .VectorDBEnums import VectorDBEnums
 from controllers import BaseController
 
@@ -13,11 +13,18 @@ class VectorDBProviderFactory:
         db_path = self.base_controller.get_database_path(
             db_name=self.config.VECTOR_DB_PATH
         )
+        
         if provider == VectorDBEnums.QDRANT.value:
             return QdrantProvider(
                 db_path=db_path,
                 distance_method=self.config.VECTOR_DB_DISTANCE_METHOD
             )
+
+        if provider == VectorDBEnums.CHROMA.value:
+            return ChromaDBProvider(
+                db_client=db_path,
+                distance_method=self.config.VECTOR_DB_DISTANCE_METHOD
+            ) 
 
 
         return None

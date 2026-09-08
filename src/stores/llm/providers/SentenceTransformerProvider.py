@@ -51,7 +51,9 @@ class SentenceTransformerProvider(LLMInterface):
             )
             return None
 
-        if isinstance(text, str):
+        is_single_text = isinstance(text, str)
+
+        if is_single_text:
             text = [text]
 
         embedding = self.embedding_client.encode(
@@ -59,7 +61,12 @@ class SentenceTransformerProvider(LLMInterface):
             convert_to_numpy=True
         )
 
-        return embedding.tolist()
+        embedding = embedding.tolist()
+
+        if is_single_text:
+            return embedding[0]
+
+        return embedding
 
     def construct_prompt(self, prompt: str, role: str):
         return {"role": role, "content": prompt}

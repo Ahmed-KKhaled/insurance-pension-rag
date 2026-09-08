@@ -1,7 +1,7 @@
 from ..VectorDBInterface import VectorDBInterface
 from stores.vectordb.VectorDBEnums import DistanceMethodEnums
 from chromadb import PersistentClient
-from models.db_schemes import RetrieveDocument
+from models.db_schemes.data_chunk import RetrievedDocument
 import logging
 from typing import List
 import uuid
@@ -25,13 +25,13 @@ class ChromaDBProvider(VectorDBInterface):
         if distance_method == DistanceMethodEnums.IP.value:
             self.distance_method = DistanceMethodEnums.IP.value
 
-     async def connect(self):
+     def connect(self):
         self.client = PersistentClient(path=self.db_client)
 
-     async def disconnect(self):
+     def disconnect(self):
         self.client = None
 
-     async def is_collection_existed(self, collection_name: str) -> bool:
+     def is_collection_existed(self, collection_name: str) -> bool:
 
         try:
             self.client.get_collection(name=collection_name)
@@ -40,19 +40,25 @@ class ChromaDBProvider(VectorDBInterface):
             self.logger.error(f"The collection name does not exist in Chromadb {e}")
             return False
 
-     async def list_all_collections(self) -> List:
+     def list_all_collections(self) -> List:
          return self.client.list_collections()
 
     
-     async def get_collection_info(self, collection_name: str) -> dict:
+     def get_collection_info(self, collection_name: str) -> dict:
 
         if not self.is_collection_existed(collection_name=collection_name):
             self.logger.error("The collection name does not exist in Chromadb")
             return False
 
-        return self.client.get_collection(name=collection_name)
+        collection = self.client.get_collection(name=collection_name)
+
+        return {
+            "name": collection.name,
+            "count": collection.count(),
+            "metadata": collection.metadata,
+        }
     
-     async def delete_collection(self, collection_name: str) -> bool:
+     def delete_collection(self, collection_name: str) -> bool:
 
         if self.is_collection_existed(collection_name=collection_name):
             self.logger.info(f"Deleting collection : {collection_name}")
@@ -61,7 +67,7 @@ class ChromaDBProvider(VectorDBInterface):
 
         return False
 
-     async def create_collection(self, collection_name: str,
+     def create_collection(self, collection_name: str,
                                         embedding_size: int = None,
                                         do_reset: bool = False):
 
@@ -80,7 +86,9 @@ class ChromaDBProvider(VectorDBInterface):
             return True
 
         return False
-     async def insert_one(self, collection_name: str,
+
+     
+     def insert_one(self, collection_name: str,
                                     text: str,
                                     vector: list,
                                     metadata: dict = None,
@@ -118,7 +126,7 @@ class ChromaDBProvider(VectorDBInterface):
             return False
 
 
-     async def insert_many(
+     def insert_many(
         self,
         collection_name: str,
         texts: list,
@@ -176,9 +184,9 @@ class ChromaDBProvider(VectorDBInterface):
 
             return False
 
-     async def search_by_vector(self, collection_name: str,
+     def search_by_vector(self, collection_name: str,
                                       vector: list,
-                                      limit: int = 5):
+                                      limit: int = 5) -> List[RetrievedDocument]:
 
         collection = self.client.get_collection(
             name=collection_name
@@ -196,8 +204,8 @@ class ChromaDBProvider(VectorDBInterface):
         distances = results["distances"][0]
 
         return [
-            RetrieveDocument(**{
-                "score": distance,
+            RetrievedDocument(**{
+                "score": 1 - distance,
                 "text": document
             })
             for document, distance in zip(documents, distances)
