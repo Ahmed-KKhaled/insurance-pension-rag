@@ -114,7 +114,7 @@ async def get_project_index_info(request: Request, project_id: str):
     return JSONResponse(
         content={
             "signal": ResponseSignal.VECTORDB_COLLECTION_RETRIEVED.value,
-            "collection_info": collection_info.model_dump()
+            "collection_info": collection_info
         }
     )
 

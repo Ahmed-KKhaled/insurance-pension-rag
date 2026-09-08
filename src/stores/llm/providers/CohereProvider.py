@@ -105,7 +105,10 @@ class CohereProvider(LLMInterface):
             self.logger.error("Error while embedding texts with CoHere")
             return None
 
-        return response.embeddings.float
+        # texts=[text] sends a single string, so the API returns exactly
+        # one embedding. Unwrap it so callers get a flat vector
+        # [0.1, 0.2, ...] instead of [[0.1, 0.2, ...]].
+        return response.embeddings.float[0]
 
 
     def construct_prompt(self, prompt: str, role: str):
