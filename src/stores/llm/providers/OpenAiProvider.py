@@ -16,7 +16,7 @@ class OpenAiProvider(LLMInterface):
         self.api_url = api_url
 
         self.default_input_max_characters = default_input_max_characters
-        self.default_generation_output_max_characters = default_generation_output_max_tokens
+        self.default_generation_output_max_tokens = default_generation_output_max_tokens
         self.default_generation_temperature = default_generation_temperature
 
         self.generation_model_id = None
@@ -64,7 +64,7 @@ class OpenAiProvider(LLMInterface):
             return None
 
 
-        max_output_tokens = max_output_tokens if max_output_tokens else self.default_generation_max_output_tokens
+        max_output_tokens = max_output_tokens if max_output_tokens else self.default_generation_output_max_tokens
         temperature = temperature if temperature else self.default_generation_temperature
 
 
@@ -86,7 +86,7 @@ class OpenAiProvider(LLMInterface):
             self.logger.error("Error while generating text with OpenAI")
             return None
 
-        return response.choices[0].message["content"]
+        return response.choices[0].message.content
 
 
     def embed_text(self,
