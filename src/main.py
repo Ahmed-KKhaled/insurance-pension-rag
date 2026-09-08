@@ -4,6 +4,7 @@ from routes import base_router, data_router, nlp_router
 from motor.motor_asyncio import AsyncIOMotorClient
 from helpers import get_settings
 from stores import LLMProviderFactory, VectorDBProviderFactory
+from stores.llm.templates import TemplateParser
 
 app = FastAPI()
 
@@ -39,6 +40,12 @@ async def startup_span():
         provider=settings.VECTOR_DB_BACKEND
     )
     app.vectordb_client.connect()
+
+    # template parser
+    app.template_parser = TemplateParser(
+        language=settings.PRIMARY_LANG,
+        default_language=settings.DEFAULT_LANG
+    )
 
 
 
