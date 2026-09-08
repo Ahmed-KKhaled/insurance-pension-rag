@@ -118,6 +118,9 @@ class NLPController(BaseController):
 
     def answer_rag_questions(self, project: Project, query: str, limit: int=10):
 
+
+        answer, full_prompt, chat_history = None, None, None
+
         # 1) retrieve related documents
         retrieved_documents = self.search_vector_db_collection(
             project=project,
@@ -126,7 +129,7 @@ class NLPController(BaseController):
         )
 
         if not retrieved_documents or len(retrieved_documents) == 0:
-            return None
+            return answer, full_prompt, chat_history
 
         # 2) construct the llm prompt
         system_prompt = self.template_parser.get(
