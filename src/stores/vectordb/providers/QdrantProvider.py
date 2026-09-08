@@ -75,10 +75,11 @@ class QdrantProvider(VectorDBInterface):
             return False
         
         try:
-            _ = self.client.upload_records(
+            _ = self.client.upsert(
                 collection_name=collection_name,
                 records=[
-                    models.Record(
+                    models.PointStruct(
+                        id = [record_id],
                         vector=vector,
                         payload={
                             "text": text, "metadata": metadata
@@ -93,52 +94,66 @@ class QdrantProvider(VectorDBInterface):
         return True
     
 
-    def insert_many(self, collection_name: str, texts: list, 
-                          vectors: list, metadata: list = None, 
-                          record_ids: list = None, batch_size: int = 50):
+    def insert_many(self,collection_name: str,
+                        texts: list,
+                        vectors: list,
+                        metadata: list = None,
+                        record_ids: list = None,
+                        batch_size: int = 50):
+
         
         if metadata is None:
             metadata = [None] * len(texts)
 
         if record_ids is None:
-            record_ids = [None] * len(texts)
+            record_ids = list(range(len(texts)))
 
         for i in range(0, len(texts), batch_size):
 
-            batch_texts = texts[i : i + batch_size]
-            batch_vectors = vectors[i : i + batch_size]
-            batch_metadata = metadata[i : i + batch_size]
+            batch_texts = texts[i:i + batch_size]
+            batch_vectors = vectors[i:i + batch_size]
+            batch_metadata = metadata[i:i + batch_size]
+            batch_records = record_ids[i:i + batch_size]
 
-            batch_records = [
-                models.Record(
+            batch_points = [
+                models.PointStruct(
+                    id=batch_records[x],
                     vector=batch_vectors[x],
                     payload={
-                        "text": batch_texts[x], "metadata": batch_metadata[x]
+                        "text": batch_texts[x],
+                        "metadata": batch_metadata[x]
                     }
                 )
-
                 for x in range(len(batch_texts))
             ]
 
             try:
-                _ = self.client.upload_records(
+                self.client.upsert(
                     collection_name=collection_name,
-                    records=batch_records,
+                    points=batch_points,
                 )
+
             except Exception as e:
-                self.logger.error(f"Error while inserting batch: {e}")
+                self.logger.error(
+                    f"Error while inserting batch: {e}"
+                )
                 return False
 
         return True
 
-
     def search_by_vector(self, collection_name: str, vector: list, limit: int = 5):
 
-        return self.client.search(
+        vector = vector[0]
+
+        response = self.client.query_points(
             collection_name=collection_name,
-            query_vector=vector,
+            query=vector,
             limit=limit
         )
+
+        return response.points
+
+    
     
         
 
