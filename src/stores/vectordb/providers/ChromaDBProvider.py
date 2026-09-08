@@ -186,7 +186,7 @@ class ChromaDBProvider(VectorDBInterface):
 
      def search_by_vector(self, collection_name: str,
                                       vector: list,
-                                      limit: int = 5):
+                                      limit: int = 5) -> List[RetrievedDocument]:
 
         collection = self.client.get_collection(
             name=collection_name

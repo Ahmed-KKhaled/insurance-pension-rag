@@ -47,7 +47,6 @@ class QdrantProvider(VectorDBInterface):
         return {
             "status": info.status,
             "points_count": info.points_count,
-            "vectors_count": info.vectors_count,
             "indexed_vectors_count": info.indexed_vectors_count,
         }
 
@@ -149,7 +148,7 @@ class QdrantProvider(VectorDBInterface):
 
         return True
 
-    def search_by_vector(self, collection_name: str, vector: list, limit: int = 5):
+    def search_by_vector(self, collection_name: str, vector: list, limit: int = 5) -> List[RetrievedDocument]:
 
         if vector and isinstance(vector[0], list):
             vector = vector[0]
