@@ -21,3 +21,4 @@
  asyncpg==0.31.0
  alembic==1.19.2
  psycopg2==2.9.12
+ pgvector==0.5.0
