@@ -26,27 +26,28 @@ class ProjectModel(BaseDataModel):
         return project
 
 
-    async def get_project_or_create_one(self, project_id: str):
+    async def get_project_or_create_one(self, project_id: int):
 
         async with self.db_client() as session:
-            result = await session.execute(
-                select(Project).where(
-                    Project.project_id == project_id
-                )
-            )
-
-            project = result.scalar_one_or_none()
-
-            if project is None:
-                project = Project(
-                    project_id=project_id
+            async with session.begin():
+                result = await session.execute(
+                    select(Project).where(
+                        Project.project_id == project_id
+                    )
                 )
 
-                session.add(project)
-                await session.commit()
-                await session.refresh(project)
+                project = result.scalar_one_or_none()
 
-            return project
+                if project is None:
+                    project = Project(
+                        project_id=project_id
+                    )
+
+                    session.add(project)
+                    await session.commit()
+                    await session.refresh(project)
+
+                return project
 
     async def get_all_projects(self, page_no: int=1, page_size: int=10):
 
@@ -57,7 +58,6 @@ class ProjectModel(BaseDataModel):
                 raise ValueError("page_size must be >= 1")
 
         async with self.db_client() as session:
-
             # total number of projects
             result = await session.execute(select(
                 func.count(Project.project_id) 
