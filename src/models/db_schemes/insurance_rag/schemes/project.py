@@ -19,3 +19,8 @@ class Project(SQLAlchemyBase):
         "Asset",
         back_populates="project"
     )
+    
+    chunks = relationship(
+        "Chunk",
+        back_populates="project"
+    )
