@@ -8,8 +8,6 @@ class AssetModel(BaseDataModel):
     def __init__(self, db_client : object):
         super().__init__(db_client=db_client)
 
-        self.db_client = db_client
-
 
     @classmethod
     async def create_instance(cls, db_client: object):
@@ -29,9 +27,12 @@ class AssetModel(BaseDataModel):
     async def get_all_project_assets(self, asset_project_id : int, asset_type: str):
 
           async with self.db_client() as session:
-            stmt = select(Asset).where(Asset.asset_project_id == asset_project_id, Asset.asset_type == asset_type)
-            result = await session.execute(stmt)
+            stmt = select(Asset).where(
+                Asset.asset_project_id == asset_project_id,
+                Asset.asset_type == asset_type
+            )
 
+            result = await session.execute(stmt)
             records = result.scalars().all()
 
             return records
