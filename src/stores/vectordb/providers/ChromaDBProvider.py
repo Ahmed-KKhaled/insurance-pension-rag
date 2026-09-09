@@ -1,7 +1,7 @@
 from ..VectorDBInterface import VectorDBInterface
 from stores.vectordb.VectorDBEnums import DistanceMethodEnums
 from chromadb import PersistentClient
-from models.db_schemes.data_chunk import RetrievedDocument
+from models.db_schemes import RetrievedDocument
 import logging
 from typing import List
 import uuid

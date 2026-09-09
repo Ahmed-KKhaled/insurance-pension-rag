@@ -7,7 +7,7 @@ from models import ResponseSignal, ProjectModel, ChunkModel, AssetModel
 from .schemes import ProcessRequest
 import aiofiles
 import logging
-from models import DataChunk, Asset
+from models import Chunk, Asset
 from models import AssetEnum
 
 logger = logging.getLogger("uvicorn.error")
@@ -125,7 +125,7 @@ async def process_endpoint(request: Request, project_id: int, process_request: P
 
      else:
 
-           project_files = await asset_model.get_all_projects_assets(
+           project_files = await asset_model.get_all_project_assets(
                 asset_project_id=project.project_id,
                 asset_type=AssetEnum.FILE.value
            )
@@ -173,7 +173,7 @@ async def process_endpoint(request: Request, project_id: int, process_request: P
             )
 
 
-        file_chunks_records = [DataChunk(
+        file_chunks_records = [Chunk(
             chunk_text = chunk.page_content,
             chunk_metadata = chunk.metadata,
             chunk_order = idx + 1,
