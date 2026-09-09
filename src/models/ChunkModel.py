@@ -1,5 +1,5 @@
 from .BaseDataModel import BaseDataModel
-from models import DataChunk
+from models import Chunk
 from models import DataBaseEnum
 from bson.objectid import ObjectId
 from pymongo import InsertOne

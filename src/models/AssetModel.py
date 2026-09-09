@@ -34,7 +34,7 @@ class AssetModel(BaseDataModel):
 
         # mongodb store info in dict format key, value
                 result = await self.collection.insert_one(asset.dict(by_alias=True, exclude_unset=True))
-                asset.id = result.inserted_id
+                asset.asset_id = result.inserted_id
         
                 return asset
 

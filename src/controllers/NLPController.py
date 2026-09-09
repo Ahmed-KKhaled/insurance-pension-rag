@@ -1,5 +1,5 @@
 from .BaseController import BaseController
-from models import Project, DataChunk
+from models import Project, Chunk
 from typing import List
 from stores.llm.LLMEnums import DocumentTypeEnum
 import logging
@@ -44,7 +44,7 @@ class NLPController(BaseController):
 
 
     def index_into_vector_db(self, project: Project,
-                                  chunks: List[DataChunk],
+                                  chunks: List[Chunk],
                                   do_reset: bool=False):
 
 
