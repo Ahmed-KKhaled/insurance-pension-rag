@@ -26,6 +26,10 @@ class Asset(SQLAlchemyBase):
         back_populates="assets"
     )
 
+    chunks = relationship(
+        "Chunk",
+        back_populates="asset"
+    )
 
 
     __table_args__ = (
