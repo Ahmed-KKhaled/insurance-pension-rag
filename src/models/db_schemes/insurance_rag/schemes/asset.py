@@ -26,4 +26,9 @@ class Asset(SQLAlchemyBase):
         back_populates="assets"
     )
 
-    
+
+
+    __table_args__ = (
+        Index("ix_asset_project_id", asset_project_id),
+        Index("ix_asset_type", asset_type)
+    )
