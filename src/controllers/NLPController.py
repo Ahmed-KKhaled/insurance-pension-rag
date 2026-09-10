@@ -2,6 +2,7 @@ from .BaseController import BaseController
 from models import Project, Chunk
 from typing import List
 from stores.llm.LLMEnums import DocumentTypeEnum
+from stores.vectordb.VectorDBEnums import PgVectorTableSchemeEnums
 import logging
 
 class NLPController(BaseController):
@@ -21,9 +22,9 @@ class NLPController(BaseController):
 
 
     def create_collection_name(self, project_id: str):
-        return f"collection_{project_id}".strip()
+        return f"{PgVectorTableSchemeEnums._PREFIX.value}_collection_{self.vectordb_client.default_vector_size}_{project_id}"
 
-    def reset_vector_db_collection(self, project: Project):
+    async def reset_vector_db_collection(self, project: Project):
         collection_name = self.create_collection_name(
             project_id=project.project_id
         )
@@ -32,7 +33,7 @@ class NLPController(BaseController):
             collection_name=collection_name
         )
 
-    def get_vector_collection_info(self, project: Project):
+    async def get_vector_collection_info(self, project: Project):
         collection_name = self.create_collection_name(
                     project_id=project.project_id
                 )
@@ -43,7 +44,7 @@ class NLPController(BaseController):
         return collection_info
 
 
-    def index_into_vector_db(self, project: Project,
+    async def index_into_vector_db(self, project: Project,
                                   chunks: List[Chunk],
                                   do_reset: bool=False):
 
@@ -56,13 +57,10 @@ class NLPController(BaseController):
         # 2) manage items
         texts = [c.chunk_text for c in chunks]
         metadata = [c.chunk_metadata for c in chunks]
-        vectors = [
-            self.embedding_client.embed_text(
-                text=text,
+        vectors = self.embedding_client.embed_text(
+                text=texts,
                 document_type=DocumentTypeEnum.DOCUMENT.value
             )
-            for text in texts
-        ]
 
         if any(vector is None for vector in vectors):
             self.logger.error(
@@ -90,23 +88,23 @@ class NLPController(BaseController):
         return is_inserted
 
 
-    def search_vector_db_collection(self, project: Project, text: str, limit: int = 10):
+    async def search_vector_db_collection(self, project: Project, text: str, limit: int = 10):
 
         # step1: get collection name
         collection_name = self.create_collection_name(project_id=project.project_id)
 
         # step2: get text embedding vector
-        vector = self.embedding_client.embed_text(text=text, 
+        query_vector = self.embedding_client.embed_text(text=text, 
                                                  document_type=DocumentTypeEnum.QUERY.value)
 
 
-        if not vector or len(vector) == 0:
+        if not query_vector or len(query_vector) == 0:
             return False
 
         # step3: do semantic search
         results = await self.vectordb_client.search_by_vector(
             collection_name=collection_name,
-            vector=vector,
+            vector= query_vector,
             limit=limit
         )
 
@@ -116,13 +114,13 @@ class NLPController(BaseController):
         return results
 
 
-    def answer_rag_questions(self, project: Project, query: str, limit: int=10):
+    async def answer_rag_questions(self, project: Project, query: str, limit: int=10):
 
 
         answer, full_prompt, chat_history = None, None, None
 
         # 1) retrieve related documents
-        retrieved_documents = self.search_vector_db_collection(
+        retrieved_documents = await self.search_vector_db_collection(
             project=project,
             text=query,
             limit=limit
