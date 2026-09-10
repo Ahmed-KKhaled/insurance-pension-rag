@@ -7,13 +7,14 @@ from typing import List
 
 class QdrantProvider(VectorDBInterface):
 
-    def __init__(self, db_path: str,
-                      distance_method: str):
+    def __init__(self, db_client: str,
+                   default_vector_size: int=786, 
+                 distance_method : str = None, index_threshold: int=100):
 
 
         self.client = None
 
-        self.db_path = db_path
+        self.db_client = db_client
         self.distance_method = None
 
         if distance_method == DistanceMethodEnums.COSINE.value:
@@ -22,11 +23,11 @@ class QdrantProvider(VectorDBInterface):
         elif distance_method == DistanceMethodEnums.DOT.value:
             self.distance_method = models.Distance.DOT
 
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger("uvicorn")
 
 
     async def connect(self):
-        self.client = QdrantClient(path=self.db_path)
+        self.client = QdrantClient(path=self.db_client)
 
     async def disconnect(self):
         self.client = None
@@ -51,7 +52,9 @@ class QdrantProvider(VectorDBInterface):
         }
 
     async def delete_collection(self, collection_name: str):
+
         if await self.is_collection_existed(collection_name=collection_name):
+            self.logger.info(f"Deleting collection : {collection_name}")
             return await self.client.delete_collection(collection_name=collection_name)
 
     async def create_collection(self, collection_name: str, 
@@ -61,6 +64,7 @@ class QdrantProvider(VectorDBInterface):
             _ = await self.delete_collection(collection_name=collection_name)
         
         if not await self.is_collection_existed(collection_name):
+            self.logger.info(f"createing new Qdrant collection: {collection_name}")
             _ = await self.client.create_collection(
                 collection_name=collection_name,
                 vectors_config=models.VectorParams(
