@@ -2,6 +2,7 @@ from ..LLMInterface import LLMInterface
 from ..LLMEnums import CohereEnums, DocumentTypeEnum
 import cohere
 import logging
+from typing import List, Union
 
 class CohereProvider(LLMInterface):
 
@@ -78,7 +79,7 @@ class CohereProvider(LLMInterface):
         
         return response.text
 
-    def embed_text(self, text: list[str], document_type: str = None):
+    def embed_text(self, text: Union[str, List[str]], document_type: str = None):
         if not self.client:
             self.logger.error("CoHere client was not set")
             return None
@@ -87,6 +88,9 @@ class CohereProvider(LLMInterface):
             self.logger.error("Embedding model for CoHere was not set")
             return None
 
+        if isinstance(text, str):
+            text = [text]
+
         input_type = CohereEnums.DOCUMENT.value
 
         if document_type == DocumentTypeEnum.QUERY.value:
@@ -94,7 +98,7 @@ class CohereProvider(LLMInterface):
 
         response = self.client.embed(
             model=self.embedding_model_id,
-            texts=[text],
+            texts=[t for t in text],
             input_type=input_type,
             embedding_types=["float"],
         )
@@ -106,15 +110,12 @@ class CohereProvider(LLMInterface):
         ):
             self.logger.error("Error while embedding texts with CoHere")
             return None
-
-        # texts=[text] sends a single string, so the API returns exactly
-        # one embedding. Unwrap it so callers get a flat vector
-        # [0.1, 0.2, ...] instead of [[0.1, 0.2, ...]].
-        return response.embeddings.float[0]
+        
+        return [f for f in response.embeddings.float]
 
 
     def construct_prompt(self, prompt: str, role: str):
         return {
             "role": role,
-            "text": self.process_text(prompt)
+            "text": prompt
         }

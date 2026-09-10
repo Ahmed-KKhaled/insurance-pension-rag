@@ -25,13 +25,13 @@ class ChromaDBProvider(VectorDBInterface):
         if distance_method == DistanceMethodEnums.IP.value:
             self.distance_method = DistanceMethodEnums.IP.value
 
-     def connect(self):
+     async def connect(self):
         self.client = PersistentClient(path=self.db_client)
 
-     def disconnect(self):
+     async def disconnect(self):
         self.client = None
 
-     def is_collection_existed(self, collection_name: str) -> bool:
+     async def is_collection_existed(self, collection_name: str) -> bool:
 
         try:
             self.client.get_collection(name=collection_name)
@@ -40,13 +40,13 @@ class ChromaDBProvider(VectorDBInterface):
             self.logger.error(f"The collection name does not exist in Chromadb {e}")
             return False
 
-     def list_all_collections(self) -> List:
+     async def list_all_collections(self) -> List:
          return self.client.list_collections()
 
     
-     def get_collection_info(self, collection_name: str) -> dict:
+     async def get_collection_info(self, collection_name: str) -> dict:
 
-        if not self.is_collection_existed(collection_name=collection_name):
+        if not await self.is_collection_existed(collection_name=collection_name):
             self.logger.error("The collection name does not exist in Chromadb")
             return False
 
@@ -58,23 +58,23 @@ class ChromaDBProvider(VectorDBInterface):
             "metadata": collection.metadata,
         }
     
-     def delete_collection(self, collection_name: str) -> bool:
+     async def delete_collection(self, collection_name: str) -> bool:
 
-        if self.is_collection_existed(collection_name=collection_name):
+        if await self.is_collection_existed(collection_name=collection_name):
             self.logger.info(f"Deleting collection : {collection_name}")
-            self.client.delete_collection(name=collection_name)
+            await self.client.delete_collection(name=collection_name)
             return True
 
         return False
 
-     def create_collection(self, collection_name: str,
+     async def create_collection(self, collection_name: str,
                                         embedding_size: int = None,
                                         do_reset: bool = False):
 
         if do_reset:
-            self.delete_collection(collection_name=collection_name)
+            await self.delete_collection(collection_name=collection_name)
 
-        if not self.is_collection_existed(collection_name=collection_name):
+        if not await self.is_collection_existed(collection_name=collection_name):
 
             self.client.create_collection(
                name=collection_name,
@@ -88,14 +88,14 @@ class ChromaDBProvider(VectorDBInterface):
         return False
 
      
-     def insert_one(self, collection_name: str,
+     async def insert_one(self, collection_name: str,
                                     text: str,
                                     vector: list,
                                     metadata: dict = None,
                                     record_id: str = None):
         
 
-        if not self.is_collection_existed(collection_name):
+        if not await self.is_collection_existed(collection_name):
             self.logger.error(
                 f"Cannot insert record into non-existent collection "
                 f"{collection_name}"
@@ -126,7 +126,7 @@ class ChromaDBProvider(VectorDBInterface):
             return False
 
 
-     def insert_many(
+     async def insert_many(
         self,
         collection_name: str,
         texts: list,
@@ -136,7 +136,7 @@ class ChromaDBProvider(VectorDBInterface):
         batch_size: int = 50
     ):
 
-        if not self.is_collection_existed(collection_name):
+        if not await self.is_collection_existed(collection_name):
 
             self.logger.error(
                 f"Cannot insert records into non-existent collection "
@@ -184,7 +184,7 @@ class ChromaDBProvider(VectorDBInterface):
 
             return False
 
-     def search_by_vector(self, collection_name: str,
+     async def search_by_vector(self, collection_name: str,
                                       vector: list,
                                       limit: int = 5) -> List[RetrievedDocument]:
 

@@ -5,40 +5,40 @@ from models.db_schemes import RetrievedDocument
 class VectorDBInterface(ABC):
 
     @abstractmethod
-    def connect(self):
+    async def connect(self):
         pass
 
     @abstractmethod
-    def disconnect(self):
+    async def disconnect(self):
         pass
 
     @abstractmethod
-    def is_collection_existed(self, collection_name: str) -> bool:
+    async def is_collection_existed(self, collection_name: str) -> bool:
         pass
 
     @abstractmethod
-    def list_all_collections(self) -> List:
+    async def list_all_collections(self) -> List:
         pass
 
     @abstractmethod
-    def get_collection_info(self, collection_name: str) -> dict:
+    async def get_collection_info(self, collection_name: str) -> dict:
         pass
 
     @abstractmethod
-    def delete_collection(self, collection_name: str):
+    async def delete_collection(self, collection_name: str):
         pass
 
     @abstractmethod
-    def create_collection(self, collection_name: str,
+    async def create_collection(self, collection_name: str,
                                 embedding_size: int,
                                 do_reset: bool=False):
 
         pass
 
     @abstractmethod
-    def insert_one(self, collection_name: str,
+    async def insert_one(self, collection_name: str,
                           text: str,
-                          vector: str,
+                          vector: list,
                           metadata: dict=None,
                           record_id: str=None):
 
@@ -46,7 +46,7 @@ class VectorDBInterface(ABC):
 
 
     @abstractmethod
-    def insert_many(self, collection_name: str,
+    async def insert_many(self, collection_name: str,
                           texts: list,
                           vectors: list,
                           metadata: list=None,
@@ -56,7 +56,7 @@ class VectorDBInterface(ABC):
         pass
 
     @abstractmethod
-    def search_by_vector(self, collection_name: str,
+    async def search_by_vector(self, collection_name: str,
                                vector: list,
                                limit: int) -> List[RetrievedDocument]:
         pass

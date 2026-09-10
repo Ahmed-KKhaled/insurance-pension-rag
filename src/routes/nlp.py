@@ -5,6 +5,7 @@ from models import ProjectModel, ChunkModel
 from controllers import NLPController
 from models.Enums import ResponseSignal
 import logging
+from tqdm.auto import tqdm
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -47,6 +48,22 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
     inserted_chunks_into_vdb = 0
     is_first_page = True
 
+
+    # create collection if not exists
+    collection_name = nlp_controller.create_collection_name(
+        project_id=project.project_id
+    )
+
+    _  = await request.app.vectordb_client.create_collection(
+         collection_name = collection_name,
+         embedding_size = request.app.embedding_client.embedding_size,
+         do_reset = push_request.do_reset
+    )
+
+    # setup batching 
+    total_chunks_count = await chunk_model.get_total_chunk_count(project_id=project.project_id)
+    pbar = tqdm(total=total_chunks_count, desc="vector indexing", position=0)
+
     while has_records:
         page_chunks = await chunk_model.get_chunks_by_project_id(
                 project_id=project.project_id,
@@ -61,7 +78,7 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
             has_records = False
             break
 
-        is_inserted = nlp_controller.index_into_vector_db(
+        is_inserted = await nlp_controller.index_into_vector_db(
                 project=project,
                 chunks=page_chunks,
                 do_reset=push_request.do_reset and is_first_page
@@ -76,6 +93,7 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
                     )
         
         inserted_chunks_into_vdb += len(page_chunks)
+        pbar.update(len(page_chunks))
         is_first_page = False
 
 
@@ -111,7 +129,7 @@ async def get_project_index_info(request: Request, project_id: int):
         template_parser=request.app.template_parser
     )
 
-    collection_info = nlp_controller.get_vector_collection_info(
+    collection_info = await nlp_controller.get_vector_collection_info(
         project=project
     )
 
@@ -147,7 +165,7 @@ async def search_index(request: Request, project_id: int, search_request: Search
         template_parser=request.app.template_parser
     )
 
-   results = nlp_controller.search_vector_db_collection(
+   results = await nlp_controller.search_vector_db_collection(
         project=project,
         text=search_request.text,
         limit=search_request.limit
@@ -186,7 +204,7 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
         template_parser=request.app.template_parser,
     )
 
-    answer, full_prompt, chat_history = nlp_controller.answer_rag_questions(
+    answer, full_prompt, chat_history = await nlp_controller.answer_rag_questions(
         project=project,
         query=search_request.text,
         limit=search_request.limit,
