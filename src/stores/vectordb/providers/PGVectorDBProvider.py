@@ -26,6 +26,7 @@ class PGVectorProvider(VectorDBInterface):
             distance_method = PgVectorDistanceMetodEnums.DOT.value
 
         self.distance_method = distance_method
+        self.default_index_name = lambda collection_name : f"{collection_name}_vector_idx"
         self.logger = logging.getLogger("uvicorn")
 
 
@@ -172,10 +173,88 @@ class PGVectorProvider(VectorDBInterface):
         
         return False
 
+    async def is_index_existed(self, collection_name: str) -> bool:
+
+        index_name = self.default_index_name(collection_name=collection_name)
+
+        async with self.db_client() as session:
+
+            check_sql = sql_text(f""" 
+                                SELECT 1 
+                                FROM pg_indexes 
+                                WHERE tablename = :collection_name
+                                AND indexname = :index_name
+                                """
+            )
+            
+            results = await session.execute(
+                 check_sql, 
+                 {"index_name": index_name,
+                  "collection_name": collection_name}
+            )
+            
+            return bool(results.scalar_one_or_none())
+
+
+
+    async def create_vector_index(self, collection_name: str,
+                                  index_type: str = PgVectorIndexTypeEnums.HNSW.value):
+
+            is_index_existed = await self.is_index_existed(collection_name=collection_name)
+            
+            if is_index_existed:
+                 self.logger.error(f"index is already created in {collection_name}")
+                 return False
+
+            async with self.db_client() as session:
+                 async with session.begin():
+                      
+                      count_sql = sql_text(
+                           f"SELECT COUNT(*) FROM {collection_name}"
+                        )
+                      
+                      result = await session.execute(count_sql)
+                      records_count = result.scalar_one()
+
+                      if records_count < self.index_threshold:
+                           return False
+
+                      self.logger.info(f"Start creating vector index for collection : {collection_name}")
+
+                      index_name = self.default_index_name(collection_name)
+                      create_idx_sql = sql_text(
+                            f'CREATE INDEX {index_name} ON {collection_name} '
+                            f'USING {index_type} ({PgVectorTableSchemeEnums.VECTOR.value} {self.distance_method})'
+                            )
+
+                      await session.execute(create_idx_sql)
+                      self.logger.info(f"End creating vector index for collection : {collection_name}")
+
+            return True
+
+
+    async def reset_vector_index(self, collection_name: str,
+                                  index_type: str = PgVectorIndexTypeEnums.HNSW.value) -> bool:
+
+            index_name = self.default_index_name(collection_name=collection_name)
+            
+            async with self.db_client() as session:
+                async with session.begin():
+                     
+                     drop_sql = sql_text(
+                          f"DROP INDEX IF EXISTS {index_name}"
+                     )
+
+                     result = await session.execute(drop_sql)
+
+
+            return await self.create_vector_index(collection_name=collection_name, 
+                                                  index_type=index_type)
+
 
     async def insert_one(self, collection_name: str,
                               text: str,
-                              vector: str,
+                              vector: list,
                               metadata: dict=None,
                               record_id: str=None):
 
@@ -219,6 +298,11 @@ class PGVectorProvider(VectorDBInterface):
                     'chunk_id': record_id
                 })
 
+
+                await self.create_vector_index(
+                     collection_name=collection_name
+                )
+
         
         return True
 
@@ -236,6 +320,8 @@ class PGVectorProvider(VectorDBInterface):
             if not is_collection_existed:
                 self.logger.error(f"Can not insert new record to non-existed collection: {collection_name}")
                 return False
+
+            record_ids = list(range(1, len(texts) + 1))
 
             if len(vectors) != len(record_ids):
                 self.logger.error(f'Invaild data items for collection: {collection_name}')
@@ -259,7 +345,7 @@ class PGVectorProvider(VectorDBInterface):
 
                             for _text, _vector, _metadata, _record_id in zip(batch_text, batch_vector, batch_metdata, batch_record_ids):
 
-                                meta_json = json.dumps(_metadata, ensure_ascii=False) if not None else "{}"
+                                meta_json = json.dumps(_metadata, ensure_ascii=False) if _metadata is not None else "{}"
 
                                 values.append({
                                     'text': _text,
@@ -287,6 +373,10 @@ class PGVectorProvider(VectorDBInterface):
                                 )
 
                             await session.execute(batch_insert_sql, values)
+
+            await self.create_vector_index(
+                     collection_name=collection_name
+                )
 
 
             return True
