@@ -28,7 +28,7 @@ class NLPController(BaseController):
             project_id=project.project_id
         )
 
-        return self.vectordb_client.delete_collection(
+        return await self.vectordb_client.delete_collection(
             collection_name=collection_name
         )
 
@@ -37,7 +37,7 @@ class NLPController(BaseController):
                     project_id=project.project_id
                 )
 
-        collection_info = self.vectordb_client.get_collection_info(
+        collection_info = await self.vectordb_client.get_collection_info(
             collection_name=collection_name
         )
         return collection_info
@@ -72,7 +72,7 @@ class NLPController(BaseController):
             return False
 
         # 3) create collection if not exists
-        _ = self.vectordb_client.create_collection(
+        _ = await self.vectordb_client.create_collection(
             collection_name=collection_name,
             embedding_size=self.embedding_client.embedding_size,
             do_reset=do_reset
@@ -80,7 +80,7 @@ class NLPController(BaseController):
 
 
         # 4) insert into vector db
-        is_inserted = self.vectordb_client.insert_many(
+        is_inserted = await self.vectordb_client.insert_many(
             collection_name=collection_name,
             texts=texts,
             vectors=vectors,
@@ -104,7 +104,7 @@ class NLPController(BaseController):
             return False
 
         # step3: do semantic search
-        results = self.vectordb_client.search_by_vector(
+        results = await self.vectordb_client.search_by_vector(
             collection_name=collection_name,
             vector=vector,
             limit=limit
