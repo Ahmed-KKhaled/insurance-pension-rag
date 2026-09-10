@@ -38,7 +38,7 @@ class VectorDBInterface(ABC):
     @abstractmethod
     async def insert_one(self, collection_name: str,
                           text: str,
-                          vector: str,
+                          vector: list,
                           metadata: dict=None,
                           record_id: str=None):
 
