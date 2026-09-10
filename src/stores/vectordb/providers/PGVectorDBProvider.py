@@ -321,7 +321,6 @@ class PGVectorProvider(VectorDBInterface):
                 self.logger.error(f"Can not insert new record to non-existed collection: {collection_name}")
                 return False
 
-            record_ids = list(range(1, len(texts) + 1))
 
             if len(vectors) != len(record_ids):
                 self.logger.error(f'Invaild data items for collection: {collection_name}')

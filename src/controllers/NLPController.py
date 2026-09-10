@@ -46,7 +46,8 @@ class NLPController(BaseController):
 
     async def index_into_vector_db(self, project: Project,
                                   chunks: List[Chunk],
-                                  do_reset: bool=False):
+                                  do_reset: bool=False,
+                                  chunks_ids: List[int]=None):
 
 
         # 1) get collection name
@@ -83,6 +84,7 @@ class NLPController(BaseController):
             texts=texts,
             vectors=vectors,
             metadata=metadata,
+            record_ids=chunks_ids
         )
 
         return is_inserted
