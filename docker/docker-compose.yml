@@ -1,25 +1,6 @@
 services:
-   mongodb:
-    image: mongo:7-jammy
-    
-    container_name: mongodb
-    
-    ports:
-      - "${MONGODB_APP_PORT}:27017"
-    
-    volumes:
-      - mongodb_data:/data/db
 
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
-
-    networks:
-      - backend
-    
-    restart: always
-
-   pgvector:
+    pgvector:
       image: pgvector/pgvector:0.8.0-pg17
 
       container_name: pgvector
@@ -45,5 +26,4 @@ networks:
   backend:
   
 volumes:
-  mongodb_data:
   pgvector_data:
