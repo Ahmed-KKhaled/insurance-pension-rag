@@ -26,7 +26,7 @@ uv --version
 ### Clone the repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Ahmed-KKhaled/insurance-pension-rag.git
 cd insurance-pension-rag
 ```
 
