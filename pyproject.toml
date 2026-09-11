@@ -1,0 +1,42 @@
+[project]
+name = "insurance-pension-rag"
+version = "0.1.0"
+description = "A RAG-based assistant for Egyptian social insurance and pension information."
+readme = "README.md"
+authors = [
+    { name = "Ahmed_KKhaled", email = "zakreahmed666@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "aiofiles==25.1.0",
+    "alembic==1.19.2",
+    "asyncpg==0.31.0",
+    "chromadb==1.5.9",
+    "cohere==7.1.1",
+    "fastapi==0.141.1",
+    "huggingface-hub==1.30.0",
+    "langchain==1.3.18",
+    "langchain-community==0.4.2",
+    "langchain-core==1.6.1",
+    "langchain-text-splitters==1.1.2",
+    "motor==3.7.1",
+    "nltk==3.10.3",
+    "openai==3.8.0",
+    "pgvector==0.5.0",
+    "psycopg2==2.9.12",
+    "pydantic-settings==2.15.0",
+    "pymupdf==1.28.2",
+    "python-dotenv==1.2.3",
+    "python-multipart==0.0.32",
+    "qdrant-client==1.19.0",
+    "sentence-transformers==6.0.1",
+    "sqlalchemy==2.0.52",
+    "uvicorn==0.52.4",
+]
+
+[project.scripts]
+insurance-pension-rag = "insurance_pension_rag:main"
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
