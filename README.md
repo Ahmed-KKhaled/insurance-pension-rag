@@ -1,64 +1,109 @@
 # insurance-pension-rag
+
 An intelligent RAG-based assistant for social insurance and pension information, providing accurate answers from trusted sources.
-
-
 
 ## Requirements
 
-- Python 3.11 or later
-
-#### Install Python using MiniConda
-
-1) Download and install MiniConda from [here](https://docs.anaconda.com/free/miniconda/#quick-command-line-install)
-2) Create a new environment using the following command:
-```bash
-$ conda create -n insurance-rag python=3.11
-```
-3) Activate the environment:
-```bash
-$ conda activate insurance-rag
-```
-
-### (Optional) Setup you command line interface for better readability
-
-```bash
-export PS1="\[\033[01;32m\]\u@\h:\w\n\[\033[00m\]\$ "
-```
+* Python 3.11 or later
+* [uv](https://docs.astral.sh/uv/)
 
 ## Installation
 
-### Install the required packages
+### Install uv
+
+If you don't have `uv` installed, install it using:
 
 ```bash
-$ pip install -r requirements.txt
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### Setup the environment variables
+Then verify the installation:
 
 ```bash
-$ cp .env.example .env
+uv --version
 ```
 
-Set your environment variables in the `.env` file. Like `OPENAI_API_KEY` value.
+### Clone the repository
+
+```bash
+git clone <repository-url>
+cd insurance-pension-rag
+```
+
+### Create the virtual environment and install dependencies
+
+```bash
+uv sync
+```
+
+This will create the project's virtual environment and install all dependencies specified in `pyproject.toml`.
+
+### Activate the virtual environment
+
+You can activate the environment manually:
+
+```bash
+source .venv/bin/activate
+```
+
+Or simply run project commands through `uv` without activating the environment:
+
+```bash
+uv run <command>
+```
+
+### Setup your command line interface for better readability
+
+```bash
+export PS1="\\[\033[01;32m\\]\u@\h:\w\n\\[\033[00m\\]\\$ "
+```
+
+## Environment Variables
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Set your environment variables in the `.env` file, such as:
+
+```env
+OPENAI_API_KEY=your_api_key
+```
 
 ## Run Docker Compose Services
 
 ```bash
-$ cd docker
-$ cp .env.example .env
+cd docker
+cp .env.example .env
 ```
 
-- update `.env` with your credentials
+Update `.env` with your credentials.
 
-
+Then start the Docker Compose services:
 
 ```bash
-$ cd docker
-$ sudo docker compose up -d
+sudo docker compose up -d
 ```
 
-## Run the FastAPI server
+## Run the FastAPI Server
+
+From the `src` directory:
 
 ```bash
-$ uvicorn main:app --reload --host 0.0.0.0 --port 5000
+cd src
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 5000
+```
+
+The API will be available at:
+
+```text
+http://localhost:5000
+```
+
+Swagger API documentation:
+
+```text
+http://localhost:5000/docs
 ```
