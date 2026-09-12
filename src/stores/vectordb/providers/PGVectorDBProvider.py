@@ -428,4 +428,59 @@ class PGVectorProvider(VectorDBInterface):
                 )
                 for record in records
             ]
+
+    async def search_by_keyword(self, collection_name: str,
+                                      query: str,
+                                      limit: int
+    ) -> List[RetrievedDocument]:
+
+        is_collection_existed = await self.is_collection_existed(collection_name=collection_name)
+         
+        if not is_collection_existed:
+            self.logger.error(f"Can not search into a non-existed collection: {collection_name}")
+            return []
+
+
+        async with self.db_client() as session:
+             async with session.begin():
+
+                search_sql = sql_text(
+                    f"""
+                    SELECT
+                        {PgVectorTableSchemeEnums.TEXT.value} AS text,
+                        ts_rank(
+                            to_tsvector('simple', {PgVectorTableSchemeEnums.TEXT.value}),
+                            plainto_tsquery('simple', :query)
+                        ) AS score
+                    FROM {collection_name}
+                    WHERE to_tsvector(
+                        'simple',
+                        {PgVectorTableSchemeEnums.TEXT.value}
+                    )
+                    @@ plainto_tsquery('simple', :query)
+                    ORDER BY score DESC
+                    LIMIT :limit
+                    """
+                )
+
+                result = await session.execute(
+                    search_sql,
+                    {
+                        "query": query,
+                        "limit": limit
+                    }
+                )
+
+                records = result.fetchall()
+
+        return [
+            RetrievedDocument(
+                text=record.text,
+                score=record.score,
+            )
+            for record in records
+        ]
+                
+
             
+                

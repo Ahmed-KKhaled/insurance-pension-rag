@@ -4,6 +4,7 @@ from typing import List
 from stores.llm.LLMEnums import DocumentTypeEnum
 from stores.vectordb.VectorDBEnums import PgVectorTableSchemeEnums
 import logging
+from models.db_schemes import RetrievedDocument
 
 class NLPController(BaseController):
 
@@ -117,6 +118,45 @@ class NLPController(BaseController):
 
         return results
 
+    async def search_hybrid(
+        self,
+        project: Project,
+        text: str,
+        limit: int = 20
+    ):
+
+        
+        collection_name = self.create_collection_name(
+            project_id=project.project_id
+        )
+
+
+        query_vector = self.embedding_client.embed_text(
+            text=text,
+            document_type=DocumentTypeEnum.QUERY.value
+        )
+
+        if not query_vector:
+            return []
+
+        vector_results = await self.vectordb_client.search_by_vector(
+            collection_name=collection_name,
+            vector=query_vector,
+            limit=limit
+        )
+
+        keyword_results = await self.vectordb_client.search_by_keyword(
+            collection_name=collection_name,
+            query=text,
+            limit=limit
+        )
+
+        return self.merge_results(
+            vector_results=vector_results,
+            keyword_results=keyword_results,
+            limit=limit
+        )
+
 
     async def answer_rag_questions(self, project: Project, query: str, limit: int=10, retrieval_limit: int = 20):
 
@@ -124,7 +164,7 @@ class NLPController(BaseController):
         answer, full_prompt, chat_history = None, None, None
 
         # 1) retrieve related documents
-        retrieved_documents = await self.search_vector_db_collection(
+        retrieved_documents = await self.search_hybrid(
             project=project,
             text=query,
             limit=retrieval_limit
@@ -194,6 +234,51 @@ class NLPController(BaseController):
         )
 
         return answer, full_prompt, chat_history, retrieved_documents
+
+
+    def merge_results(
+        self,
+        vector_results: List[RetrievedDocument],
+        keyword_results: List[RetrievedDocument],
+        limit: int = 20,
+        k: int = 60
+    ) -> List[RetrievedDocument]:
+
+        scores = {}
+        documents = {}
+
+        for rank, document in enumerate(vector_results, start=1):
+
+            document_id = document.text
+
+            documents[document_id] = document
+
+            scores[document_id] = scores.get(
+                document_id,
+                0
+            ) + (1 / (k + rank))
+
+        for rank, document in enumerate(keyword_results, start=1):
+
+            document_id = document.text
+
+            documents[document_id] = document
+
+            scores[document_id] = scores.get(
+                document_id,
+                0
+            ) + (1 / (k + rank))
+
+        ranked_documents = sorted(
+            documents.items(),
+            key=lambda x: scores[x[0]],
+            reverse=True
+        )
+
+        return [
+            documents[document_id]
+            for document_id, _ in ranked_documents[:limit]
+        ]
 
         
 

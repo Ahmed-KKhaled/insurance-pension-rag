@@ -61,5 +61,16 @@ class VectorDBInterface(ABC):
                                limit: int) -> List[RetrievedDocument]:
         pass
 
+    
+
+    @abstractmethod
+    async def search_by_keyword(
+        self,
+        collection_name: str,
+        query: str,
+        limit: int
+    ) -> List[RetrievedDocument]:
+        pass
+
 
 

@@ -172,7 +172,7 @@ async def search_index(request: Request, project_id: int, search_request: Search
         reranker_client=request.app.reranker_client
     )
 
-   results = await nlp_controller.search_vector_db_collection(
+   results = await nlp_controller.search_hybrid(
         project=project,
         text=search_request.text,
         limit=search_request.reranker_limit
