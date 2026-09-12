@@ -28,6 +28,7 @@ async def startup_span():
     llm_provider_factory = LLMProviderFactory(config=settings)
     vectordb_provider_factory = VectorDBProviderFactory(
         config=settings,
+        db_client=app.db_client
     )
 
     # Generation client
