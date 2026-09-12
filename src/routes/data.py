@@ -150,7 +150,8 @@ async def process_endpoint(request: Request, project_id: int, process_request: P
              vectordb_client=request.app.vectordb_client,
              generation_client=request.app.generation_client,
              embedding_client=request.app.embedding_client,
-             template_parser=request.app.template_parser
+             template_parser=request.app.template_parser,
+             reranker_client=request.app.reranker_client
      )
 
      if do_reset:
