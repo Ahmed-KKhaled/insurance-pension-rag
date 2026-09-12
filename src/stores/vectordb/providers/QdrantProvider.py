@@ -68,10 +68,17 @@ class QdrantProvider(VectorDBInterface):
             self.logger.info(f"createing new Qdrant collection: {collection_name}")
             _ =  self.client.create_collection(
                 collection_name=collection_name,
-                vectors_config=models.VectorParams(
-                    size=embedding_size,
-                    distance=self.distance_method
-                )
+                    vectors_config={
+                        "dense": models.VectorParams(
+                            size=embedding_size,
+                            distance=self.distance_method
+                        )
+                    },
+                    sparse_vectors_config={
+                        "sparse": models.SparseVectorParams(
+                            modifier=models.Modifier.IDF
+                        )
+                    }
             )
 
             return True
@@ -130,7 +137,14 @@ class QdrantProvider(VectorDBInterface):
             batch_points = [
                 models.PointStruct(
                     id=batch_records[x],
-                    vector=batch_vectors[x],
+                    vector={
+                        "dense": batch_vectors[x],
+                        "sparse": models.Document(
+                            text=batch_texts[x],
+                            model="Qdrant/bm25"
+                        )
+                    },
+
                     payload={
                         "text": batch_texts[x],
                         "metadata": batch_metadata[x]
@@ -161,7 +175,9 @@ class QdrantProvider(VectorDBInterface):
         responses = self.client.query_points(
             collection_name=collection_name,
             query=vector,
-            limit=limit
+            using="dense",
+            limit=limit,
+            with_payload=True
         )
 
         if not responses.points:
@@ -188,14 +204,11 @@ class QdrantProvider(VectorDBInterface):
 
         results = self.client.query_points(
             collection_name=collection_name,
-
             query=models.Document(
                 text=query,
                 model="Qdrant/bm25"
             ),
-
             using="sparse",
-
             limit=limit,
             with_payload=True
         ).points
