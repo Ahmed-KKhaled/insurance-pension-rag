@@ -10,7 +10,8 @@ class NLPController(BaseController):
     def __init__(self, vectordb_client, 
                        generation_client,
                        embedding_client,
-                       template_parser):
+                       template_parser,
+                       reranker_client):
         
         super().__init__()
 
@@ -18,6 +19,7 @@ class NLPController(BaseController):
         self.generation_client = generation_client
         self.embedding_client = embedding_client
         self.template_parser = template_parser
+        self.reranker_client = reranker_client
         self.logger = logging.getLogger("uvicorn")
 
 
@@ -116,7 +118,7 @@ class NLPController(BaseController):
         return results
 
 
-    async def answer_rag_questions(self, project: Project, query: str, limit: int=10):
+    async def answer_rag_questions(self, project: Project, query: str, limit: int=10, retrieval_limit: int = 20):
 
 
         answer, full_prompt, chat_history = None, None, None
@@ -125,19 +127,34 @@ class NLPController(BaseController):
         retrieved_documents = await self.search_vector_db_collection(
             project=project,
             text=query,
-            limit=limit
+            limit=retrieval_limit
         )
 
         if not retrieved_documents or len(retrieved_documents) == 0:
             return answer, full_prompt, chat_history
 
-        # 2) construct the llm prompt
+
+        # 2) Rerank retrieved documents
+        reranked_documents = self.reranker_client.rerank(
+            query=query,
+            documents=retrieved_documents
+        )
+
+        if not reranked_documents or len(reranked_documents) == 0:
+            return answer, full_prompt, chat_history
+
+        # 3) Keep only the top-k reranked documents
+        if len(reranked_documents) >= limit:
+             retrieved_documents = reranked_documents[:limit]
+
+        else:
+            retrieved_documents = reranked_documents
+
+        # 4) construct the llm prompt
         system_prompt = self.template_parser.get(
             group="rag",
             key="system_prompt",
         )
-
-
 
         documents_prompts = "\n".join([self.template_parser.get(
             group="rag",
@@ -176,7 +193,7 @@ class NLPController(BaseController):
 
         )
 
-        return answer, full_prompt, chat_history
+        return answer, full_prompt, chat_history, retrieved_documents
 
         
 

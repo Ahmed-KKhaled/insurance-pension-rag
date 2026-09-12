@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     PRIMARY_LANG:str=None
     DEFAULT_LANG:str="en"
 
+    RERANKER_BACKEND: str
+    RERANKER_MODEL_ID: str
+    RERANKER_MAX_LENGTH: int=8192
+
     class Config:
         env_file=".env"
 
