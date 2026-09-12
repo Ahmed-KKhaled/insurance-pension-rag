@@ -16,6 +16,7 @@ class QdrantProvider(VectorDBInterface):
 
         self.db_client = db_client
         self.distance_method = None
+        self.default_vector_size = default_vector_size
 
         if distance_method == DistanceMethodEnums.COSINE.value:
             self.distance_method = models.Distance.COSINE
@@ -55,7 +56,7 @@ class QdrantProvider(VectorDBInterface):
 
         if await self.is_collection_existed(collection_name=collection_name):
             self.logger.info(f"Deleting collection : {collection_name}")
-            return await self.client.delete_collection(collection_name=collection_name)
+            return self.client.delete_collection(collection_name=collection_name)
 
     async def create_collection(self, collection_name: str, 
                                 embedding_size: int,
@@ -65,7 +66,7 @@ class QdrantProvider(VectorDBInterface):
         
         if not await self.is_collection_existed(collection_name):
             self.logger.info(f"createing new Qdrant collection: {collection_name}")
-            _ = await self.client.create_collection(
+            _ =  self.client.create_collection(
                 collection_name=collection_name,
                 vectors_config=models.VectorParams(
                     size=embedding_size,
@@ -178,5 +179,32 @@ class QdrantProvider(VectorDBInterface):
     
         
 
-    
+    async def search_by_keyword(
+    self,
+    collection_name: str,
+    query: str,
+    limit: int
+    ):
+
+        results = self.client.query_points(
+            collection_name=collection_name,
+
+            query=models.Document(
+                text=query,
+                model="Qdrant/bm25"
+            ),
+
+            using="sparse",
+
+            limit=limit,
+            with_payload=True
+        ).points
+
+        return [
+            RetrievedDocument(
+                text=record.payload["text"],
+                score=record.score
+            )
+            for record in results
+        ]
         

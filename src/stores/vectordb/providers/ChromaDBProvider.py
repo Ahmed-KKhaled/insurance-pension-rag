@@ -2,6 +2,7 @@ from ..VectorDBInterface import VectorDBInterface
 from stores.vectordb.VectorDBEnums import DistanceMethodEnums
 from chromadb import PersistentClient
 from models.db_schemes import RetrievedDocument
+from rank_bm25 import BM25Okapi
 import logging
 from typing import List
 import uuid
@@ -62,7 +63,7 @@ class ChromaDBProvider(VectorDBInterface):
 
         if await self.is_collection_existed(collection_name=collection_name):
             self.logger.info(f"Deleting collection : {collection_name}")
-            await self.client.delete_collection(name=collection_name)
+            self.client.delete_collection(name=collection_name)
             return True
 
         return False
@@ -148,11 +149,7 @@ class ChromaDBProvider(VectorDBInterface):
         if metadata is None:
             metadata = [{} for _ in texts]
 
-        if record_ids is None:
-            record_ids = [
-                str(uuid.uuid4())
-                for _ in texts
-            ]
+        record_ids = [str(record_id) for record_id in record_ids]
 
         try:
 
@@ -209,4 +206,48 @@ class ChromaDBProvider(VectorDBInterface):
                 "text": document
             })
             for document, distance in zip(documents, distances)
+        ]
+
+
+     async def search_by_keyword(self, collection_name: str,
+                                        query: str,
+                                        limit: int
+      ) -> List[RetrievedDocument]:
+
+        collection = self.client.get_collection(
+            name=collection_name
+        )
+
+        results = collection.get(
+            include=["documents"]
+        )
+
+        documents = results.get("documents", [])
+
+        if not documents:
+            return []
+
+        tokenized_documents = [
+            document.split()
+            for document in documents
+        ]
+
+        bm25 = BM25Okapi(tokenized_documents)
+
+        query_tokens = query.split()
+
+        scores = bm25.get_scores(query_tokens)
+
+        ranked_results = sorted(
+            zip(documents, scores),
+            key=lambda x: x[1],
+            reverse=True
+        )
+
+        return [
+            RetrievedDocument(
+                text=document,
+                score=float(score)
+            )
+            for document, score in ranked_results[:limit]
         ]
