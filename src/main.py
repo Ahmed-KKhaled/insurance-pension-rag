@@ -23,10 +23,11 @@ async def startup_span():
         expire_on_commit=False
     )
 
+    
+
     llm_provider_factory = LLMProviderFactory(config=settings)
     vectordb_provider_factory = VectorDBProviderFactory(
         config=settings,
-        db_client=app.db_client
     )
 
     # Generation client
