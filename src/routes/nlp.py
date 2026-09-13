@@ -280,7 +280,7 @@ async def chat( request: Request, project_id: int, chat_request: ChatRequest):
     conversation = await conversation_model.get_or_create_conversation(
     project_id=project.project_id,
     conversation_uuid=chat_request.conversation_uuid,
-    title="New Conversation"
+    title=chat_request.title
     )
 
     if conversation is None:
@@ -300,7 +300,7 @@ async def chat( request: Request, project_id: int, chat_request: ChatRequest):
         message_model=message_model
     )
 
-    answer, full_prompt, retrieved_documents, chat_history = (
+    answer, full_prompt, retrieved_documents, chat_history, rewritten_query = (
         await nlp_controller.answer_chat_question(
             project=project,
             conversation=conversation,
@@ -325,7 +325,8 @@ async def chat( request: Request, project_id: int, chat_request: ChatRequest):
             "answer": answer,
             "full_prompt": full_prompt,
             "retrieved_documents": retrieved_documents,
-            "chat_history" : chat_history
+            "chat_history" : chat_history,
+            "rewritten_query": rewritten_query
         })
     )
 
