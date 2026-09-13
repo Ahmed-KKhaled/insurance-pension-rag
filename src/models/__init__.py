@@ -6,3 +6,5 @@ from .ProjectModel import ProjectModel
 from .ChunkModel import ChunkModel
 from .AssetModel import AssetModel
 from .Enums import AssetEnum
+from .ConversationModel import ConversationModel
+from .MessageModel import MessageModel

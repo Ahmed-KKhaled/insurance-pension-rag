@@ -24,3 +24,8 @@ class Project(SQLAlchemyBase):
         "Chunk",
         back_populates="project"
     )
+
+    conversations = relationship(
+        "Conversation",
+        back_populates="project"
+    )

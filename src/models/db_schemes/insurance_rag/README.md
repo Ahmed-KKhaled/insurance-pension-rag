@@ -11,16 +11,16 @@ cp alembic.ini.example alembic.ini
 ### (Optional) Create a new migration
 
 ```bash
-alembic revision --autogenerate -m "Add ..."
+uv run alembic revision --autogenerate -m "Add ..."
 ```
 
 ### Upgrade the database
 
 ```bash
-alembic upgrade head
+uv run alembic upgrade head
 ```
 
 ### Downgrade the database
 ```bash
-alembic downgrade -1
+uv run alembic downgrade -1
 ```

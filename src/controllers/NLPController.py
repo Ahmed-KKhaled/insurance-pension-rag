@@ -1,5 +1,6 @@
 from .BaseController import BaseController
 from models import Project, Chunk
+from models.db_schemes.insurance_rag.schemes import Conversation, Message
 from typing import List
 from stores.llm.LLMEnums import DocumentTypeEnum
 from stores.vectordb.VectorDBEnums import PgVectorTableSchemeEnums
@@ -12,7 +13,8 @@ class NLPController(BaseController):
                        generation_client,
                        embedding_client,
                        template_parser,
-                       reranker_client):
+                       reranker_client,
+                       message_model):
         
         super().__init__()
 
@@ -21,6 +23,7 @@ class NLPController(BaseController):
         self.embedding_client = embedding_client
         self.template_parser = template_parser
         self.reranker_client = reranker_client
+        self.message_model = message_model
         self.logger = logging.getLogger("uvicorn")
 
 
@@ -157,11 +160,62 @@ class NLPController(BaseController):
             limit=limit
         )
 
+    def merge_results(
+            self,
+            vector_results: List[RetrievedDocument],
+            keyword_results: List[RetrievedDocument],
+            limit: int = 20,
+            k: int = 60
+        ) -> List[RetrievedDocument]:
+    
+            scores = {}
+            documents = {}
+    
+            for rank, document in enumerate(vector_results, start=1):
+    
+                document_id = document.text
+    
+                documents[document_id] = document
+    
+                scores[document_id] = scores.get(
+                    document_id,
+                    0
+                ) + (1 / (k + rank))
+    
+            for rank, document in enumerate(keyword_results, start=1):
+    
+                document_id = document.text
+    
+                documents[document_id] = document
+    
+                scores[document_id] = scores.get(
+                    document_id,
+                    0
+                ) + (1 / (k + rank))
+    
+            ranked_documents = sorted(
+                documents.items(),
+                key=lambda x: scores[x[0]],
+                reverse=True
+            )
+    
+            return [
+                documents[document_id]
+                for document_id, _ in ranked_documents[:limit]
+            ]
 
-    async def answer_rag_questions(self, project: Project, query: str, limit: int=10, retrieval_limit: int = 20):
+
+    async def answer_rag_questions(self, project: Project,
+                                         query: str,
+                                         limit: int=10,
+                                         retrieval_limit: int = 20,
+                                         chat_history: list = None):
+
+        if chat_history is None:
+            chat_history = []
 
 
-        answer, full_prompt, chat_history = None, None, None
+        answer, full_prompt = None, None
 
         # 1) retrieve related documents
         retrieved_documents = await self.search_hybrid(
@@ -171,7 +225,7 @@ class NLPController(BaseController):
         )
 
         if not retrieved_documents or len(retrieved_documents) == 0:
-            return answer, full_prompt, chat_history
+            return answer, full_prompt, chat_history, []
 
 
         # 2) Rerank retrieved documents
@@ -181,7 +235,7 @@ class NLPController(BaseController):
         )
 
         if not reranked_documents or len(reranked_documents) == 0:
-            return answer, full_prompt, chat_history
+            return answer, full_prompt, chat_history, []
 
         # 3) Keep only the top-k reranked documents
         if len(reranked_documents) >= limit:
@@ -213,13 +267,13 @@ class NLPController(BaseController):
             }
         )
 
-        chat_history = [
-            self.generation_client.construct_prompt(
-                prompt=system_prompt,
-                role=self.generation_client.enums.SYSTEM.value
+        system_message = self.generation_client.construct_prompt(
+        prompt=system_prompt,
+        role=self.generation_client.enums.SYSTEM.value
+)
 
-            )
-        ]
+        chat_history = [system_message] + chat_history
+
 
         full_prompt = "\n\n".join([
             documents_prompts,
@@ -233,59 +287,90 @@ class NLPController(BaseController):
 
         )
 
+
+        self.logger.info(f"Generated answer: {answer!r}")
+
         return answer, full_prompt, chat_history, retrieved_documents
 
 
-    def merge_results(
-        self,
-        vector_results: List[RetrievedDocument],
-        keyword_results: List[RetrievedDocument],
-        limit: int = 20,
-        k: int = 60
-    ) -> List[RetrievedDocument]:
+    def build_chat_history(self, messages: list):
+    
+        chat_history = []
 
-        scores = {}
-        documents = {}
+        for message in messages:
 
-        for rank, document in enumerate(vector_results, start=1):
+            if message.role == "user":
+                role = self.generation_client.enums.USER.value
 
-            document_id = document.text
+            elif message.role == "assistant":
+                role = self.generation_client.enums.ASSISTANT.value
 
-            documents[document_id] = document
+            else:
+                continue
 
-            scores[document_id] = scores.get(
-                document_id,
-                0
-            ) + (1 / (k + rank))
+            chat_history.append(
+                self.generation_client.construct_prompt(
+                    prompt=message.content,
+                    role=role
+                )
+            )
 
-        for rank, document in enumerate(keyword_results, start=1):
+        return chat_history
 
-            document_id = document.text
+    async def answer_chat_question(
+    self,
+    project: Project,
+    conversation,
+    query: str,
+    limit: int = 10,
+    retrieval_limit: int = 20):
 
-            documents[document_id] = document
-
-            scores[document_id] = scores.get(
-                document_id,
-                0
-            ) + (1 / (k + rank))
-
-        ranked_documents = sorted(
-            documents.items(),
-            key=lambda x: scores[x[0]],
-            reverse=True
+        # 1. Load previous messages
+        messages = await self.message_model.get_messages_by_conversation_id(
+            conversation_id=conversation.conversation_id,
+            page_no=1,
+            page_size=50
         )
 
-        return [
-            documents[document_id]
-            for document_id, _ in ranked_documents[:limit]
-        ]
+        # 2. Convert DB messages to LLM chat history
+        chat_history = self.build_chat_history(
+            messages=messages
+        )
 
-        
+        # 3. Run RAG
+        answer, full_prompt, _, retrieved_documents = (
+            await self.answer_rag_questions(
+                project=project,
+                query=query,
+                limit=limit,
+                retrieval_limit=retrieval_limit,
+                chat_history=chat_history
+            )
+        )
 
+        if not answer:
+            return None, full_prompt, retrieved_documents
 
+        # 4. Save user message
+        user_message = Message(
+            role="user",
+            content=query,
+            message_conversation_id=conversation.conversation_id
+        )
 
-        
+        await self.message_model.insert_message(
+            message=user_message
+        )
 
+        # 5. Save assistant message
+        assistant_message = Message(
+            role="assistant",
+            content=answer,
+            message_conversation_id=conversation.conversation_id
+        )
 
+        await self.message_model.insert_message(
+            message=assistant_message
+        )
 
-
+        return answer, full_prompt, retrieved_documents, chat_history
