@@ -31,3 +31,35 @@ footer_prompt = Template("\n".join([
     "",
     "## Answer:",
 ]))
+
+
+query_rewriter_prompt = Template("\n".join([
+    "Rewrite the user's latest question into a standalone and clear search query.",
+    "",
+    "Use the conversation history to resolve references and pronouns such as:",
+    "- he",
+    "- she",
+    "- it",
+    "- this",
+    "- that",
+    "- them",
+    "- the previous one",
+    "- the next one",
+    "- the one mentioned earlier",
+    "",
+    "Rules:",
+    "- Preserve the original meaning of the question.",
+    "- Do not answer the question.",
+    "- Return only the rewritten search query.",
+    "- If the question is already standalone and clear, return it unchanged.",
+    "- Write the rewritten query in English.",
+    "",
+    "Conversation history:",
+    "$chat_history",
+    "",
+    "Latest user question:",
+    "$query",
+    "",
+    "Standalone search query:",
+]))
+

@@ -238,11 +238,7 @@ class NLPController(BaseController):
             return answer, full_prompt, chat_history, []
 
         # 3) Keep only the top-k reranked documents
-        if len(reranked_documents) >= limit:
-             retrieved_documents = reranked_documents[:limit]
-
-        else:
-            retrieved_documents = reranked_documents
+        retrieved_documents = reranked_documents[:limit]
 
         # 4) construct the llm prompt
         system_prompt = self.template_parser.get(
@@ -317,6 +313,18 @@ class NLPController(BaseController):
 
         return chat_history
 
+    def build_rewrite_history(self, messages: list) -> str:
+
+        history = []
+
+        for message in messages:
+
+            history.append(
+                f"{message.role}: {message.content}"
+            )
+
+        return "\n".join(history)
+
     async def answer_chat_question(
     self,
     project: Project,
@@ -328,8 +336,6 @@ class NLPController(BaseController):
         # 1. Load previous messages
         messages = await self.message_model.get_messages_by_conversation_id(
             conversation_id=conversation.conversation_id,
-            page_no=1,
-            page_size=50
         )
 
         # 2. Convert DB messages to LLM chat history
@@ -337,11 +343,37 @@ class NLPController(BaseController):
             messages=messages
         )
 
+        if messages:
+            # For query rewriting
+            rewrite_history = self.build_rewrite_history(
+                messages=messages
+            )
+
+            query_rewriter_prompt = self.template_parser.get(
+                        group="rag",
+                        key="query_rewriter_prompt",
+                        vars={
+                            "chat_history" : rewrite_history,
+                            "query" : query
+                        }
+            )
+
+            rewritten_query = self.generation_client.generate_text(
+                prompt=query_rewriter_prompt,
+                chat_history=[]
+            )
+
+            rewritten_query = rewritten_query.strip()
+
+        else:
+            rewritten_query=query
+        
+
         # 3. Run RAG
         answer, full_prompt, _, retrieved_documents = (
             await self.answer_rag_questions(
                 project=project,
-                query=query,
+                query=rewritten_query,
                 limit=limit,
                 retrieval_limit=retrieval_limit,
                 chat_history=chat_history
@@ -349,11 +381,11 @@ class NLPController(BaseController):
         )
 
         if not answer:
-            return None, full_prompt, retrieved_documents
+            return None, full_prompt, retrieved_documents, chat_history
 
         # 4. Save user message
         user_message = Message(
-            role="user",
+            role=self.generation_client.enums.USER.value,
             content=query,
             message_conversation_id=conversation.conversation_id
         )
@@ -364,7 +396,7 @@ class NLPController(BaseController):
 
         # 5. Save assistant message
         assistant_message = Message(
-            role="assistant",
+            role=self.generation_client.enums.ASSISTANT.value,
             content=answer,
             message_conversation_id=conversation.conversation_id
         )
@@ -373,4 +405,4 @@ class NLPController(BaseController):
             message=assistant_message
         )
 
-        return answer, full_prompt, retrieved_documents, chat_history
+        return answer, full_prompt, retrieved_documents, chat_history, rewritten_query

@@ -61,12 +61,7 @@ class ConversationModel(BaseDataModel):
 
             return result.scalar_one_or_none()
 
-    async def get_or_create_conversation(
-                                self,
-                                project_id: int,
-                                conversation_uuid=None,
-                                title: str = "New Conversation"
-    ):
+    async def get_or_create_conversation(self, project_id: int, conversation_uuid=None, title: str = "New Conversation"):
        
         if conversation_uuid is not None:
 
