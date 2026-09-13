@@ -16,3 +16,4 @@ class ChatRequest(BaseModel):
 
     limit: int = 10
     reranker_limit: int = 20
+    title: Optional[str] = "New conversation"
