@@ -2,7 +2,8 @@ from .BaseController import BaseController
 from .ProjectController import ProjectController
 import os
 from langchain_community.document_loaders import TextLoader
-from langchain_community.document_loaders import PyMuPDFLoader
+from .loaders import OCRPDFLoader
+import re
 from models import ProcessingEnum
 import logging
 from typing import List
@@ -19,7 +20,7 @@ class ProcessController(BaseController):
 
         self.project_id = project_id
         self.project_path = ProjectController().get_project_path(project_id=project_id)
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger("uvicorn.error")
 
 
     def get_file_extension(self, file_id: str):
@@ -42,7 +43,7 @@ class ProcessController(BaseController):
             return TextLoader(file_path, encoding="utf-8")
 
         elif file_ext == ProcessingEnum.PDF.value:
-            return PyMuPDFLoader(file_path)
+            return OCRPDFLoader(file_path, dpi=300)
 
         return None
 
@@ -55,73 +56,207 @@ class ProcessController(BaseController):
 
         return None
 
+    def normalize_text(self, text: str) -> str:
+
+        lines = []
+
+        for line in text.splitlines():
+
+            line = line.strip()
+
+            if len(line) > 1:
+                lines.append(line)
+
+        return "\n".join(lines)
 
     def process_file_content(self, file_id: str,
-                             chunk_size: int=100, overlap_size: int=20):
+                             chunk_size: int=1000, overlap_size: int=100):
 
-        
+
+        self.logger.info("start getting the file content")
         file_content = self.get_file_content(file_id=file_id)
 
         if file_content is None:
             self.logger.error(f"Error While processing {file_id}")
             return None
 
-        file_content_texts = [rec.page_content for rec in file_content]
+        self.logger.info("end getting the file content")
 
-        file_content_metadata = [rec.metadata for rec in file_content]
+        documents = []
+        self.logger.info("start processing the file content")
 
-        chunks = self.process_simplier_splitter(
-            texts=file_content_texts,
-            metadatas=file_content_metadata,
-            chunk_size=chunk_size
-        )
+        for page in file_content:
 
-        return chunks
+            self.logger.info("start normalizaing text the file content")
+
+            text = self.normalize_text(
+                text=page.page_content
+            )
+
+            if not text:
+                continue
+
+            metadata = page.metadata.copy()
+
+            self.logger.info("start using section_aware_splitter")
+
+            page_documents = self.process_section_aware_splitter(
+                text=text,
+                metadata=metadata,
+                chunk_size=chunk_size,
+                overlap_size=overlap_size
+            )
+
+            documents.extend(page_documents)
+        self.logger.info("file processed successfully")
+        return documents
 
 
-    def process_simplier_splitter(
-        self,
-        texts: List[str],
-        metadatas: List[dict],
-        chunk_size: int,
-        splitter_tag: str = "\n"
+    def process_section_aware_splitter(
+            self, 
+            text: str,
+            metadata: dict,
+            chunk_size: int,
+            overlap_size: int
     ):
 
+        self.logger.info("start split_by_articles")
+        
+        sections = self.split_by_articles(text)
+
         chunks = []
+        self.logger.info("end split_by_articles")
 
-        for text, metadata in zip(texts, metadatas):
+        self.logger.info("start loop sections")
 
-            lines = [
-                line.strip()
-                for line in text.split(splitter_tag)
-                if len(line.strip()) > 1
-            ]
+        for article_num, article_text in sections:
 
-            cur_chunk = ""
+            article_text = article_text.strip()
 
-            for line in lines:
+            if not article_text:
+                continue
 
-                cur_chunk += line + splitter_tag
+            article_metadata = metadata.copy()
+            article_metadata["article"] = article_num
 
-                if len(cur_chunk) >= chunk_size:
+            article_chunks = self.split_large_section(
+                text=article_text,
+                chunk_size=chunk_size,
+                overlap_size=overlap_size
+            )
 
-                    chunks.append(
-                        Document(
-                            page_content=cur_chunk.strip(),
-                            metadata=metadata.copy()
-                        )
-                    )
-
-                    cur_chunk = ""
-
-            if len(cur_chunk.strip()) > 0:
+            for chunk in article_chunks:
 
                 chunks.append(
                     Document(
-                        page_content=cur_chunk.strip(),
-                        metadata=metadata.copy()
+                        page_content=chunk,
+                        metadata=article_metadata.copy()
                     )
                 )
 
+        self.logger.info("end loop sections")
+
         return chunks
-       
+
+
+    def split_by_articles(self, text: str):
+
+        pattern = r"(?=مادة\s*(?:\(\s*)?[0-9٠-٩]+\s*(?:\))?\s*:?)"
+
+        matches = list(
+            re.finditer(
+                pattern,
+                text,
+                flags=re.IGNORECASE
+            )
+        )
+
+        if not matches:
+            return [
+                ("unknown", text)
+            ]
+
+        sections = []
+
+        for index, match in enumerate(matches):
+
+            start = match.start()
+
+            if index + 1 < len(matches):
+                end = matches[index + 1].start()
+            else:
+                end = len(text)
+
+            article_text = text[start:end].strip()
+
+            article_number = match.group().strip()
+
+            sections.append(
+                (
+                    article_number,
+                    article_text
+                )
+            )
+
+        return sections
+
+
+    def split_large_section(
+        self,
+        text: str,
+        chunk_size: int,
+        overlap_size: int
+    ):
+
+        if len(text) <= chunk_size:
+            return [text]
+
+        words = text.split()
+
+        chunks = []
+
+        current_chunk = []
+        current_length = 0
+
+        for word in words:
+
+            word_length = len(word) + 1
+
+            if (
+                current_length + word_length > chunk_size
+                and current_chunk
+            ):
+
+                chunk = " ".join(current_chunk)
+
+                chunks.append(chunk)
+
+                overlap_words = []
+                overlap_length = 0
+
+                for previous_word in reversed(current_chunk):
+
+                    if overlap_length + len(previous_word) + 1 > overlap_size:
+                        break
+
+                    overlap_words.insert(
+                        0,
+                        previous_word
+                    )
+
+                    overlap_length += len(previous_word) + 1
+
+                current_chunk = overlap_words
+
+                current_length = overlap_length
+
+            current_chunk.append(word)
+            current_length += word_length
+
+        if current_chunk:
+            chunks.append(
+                " ".join(current_chunk)
+            )
+
+        return chunks
+    
