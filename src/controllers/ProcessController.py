@@ -2,7 +2,7 @@ from .BaseController import BaseController
 from .ProjectController import ProjectController
 import os
 from langchain_community.document_loaders import TextLoader
-from .loaders import OCRPDFLoader
+from .loaders import OCRPDFLoader, PDFTableDetector, TableLoader
 import re
 from models import ProcessingEnum
 import logging
@@ -15,12 +15,13 @@ class Document:
     metadata: dict
 
 class ProcessController(BaseController):
-    def __init__(self, project_id: str):
+    def __init__(self, project_id: str, table_extractor):
         super().__init__()
 
         self.project_id = project_id
         self.project_path = ProjectController().get_project_path(project_id=project_id)
         self.logger = logging.getLogger("uvicorn.error")
+        self.table_extractor = table_extractor
 
 
     def get_file_extension(self, file_id: str):
@@ -43,7 +44,7 @@ class ProcessController(BaseController):
             return TextLoader(file_path, encoding="utf-8")
 
         elif file_ext == ProcessingEnum.PDF.value:
-            return OCRPDFLoader(file_path, dpi=300)
+            return OCRPDFLoader(file_path)
 
         return None
 
@@ -69,25 +70,46 @@ class ProcessController(BaseController):
 
         return "\n".join(lines)
 
-    def process_file_content(self, file_id: str,
+    async def process_file_content(self, file_id: str,
                              chunk_size: int=1000, overlap_size: int=100):
 
 
-        self.logger.info("start getting the file content")
-        file_content = self.get_file_content(file_id=file_id)
+        file_ext = self.get_file_extension(file_id=file_id)
+
+        if file_ext == ProcessingEnum.PDF.value:
+            return await self.process_pdf(
+                file_id=file_id,
+                chunk_size=chunk_size,
+                overlap_size=overlap_size
+            )
+
+        if file_ext == ProcessingEnum.TXT.value:
+            return self.process_text(
+                file_id=file_id,
+                chunk_size=chunk_size,
+                overlap_size=overlap_size
+            )
+
+    def process_text(
+    self,
+    file_id: str,
+    chunk_size: int = 1000,
+    overlap_size: int = 100
+):
+
+        file_content = self.get_file_content(
+            file_id=file_id
+        )
 
         if file_content is None:
-            self.logger.error(f"Error While processing {file_id}")
+            self.logger.error(
+                f"Error While processing {file_id}"
+            )
             return None
 
-        self.logger.info("end getting the file content")
-
         documents = []
-        self.logger.info("start processing the file content")
 
         for page in file_content:
-
-            self.logger.info("start normalizaing text the file content")
 
             text = self.normalize_text(
                 text=page.page_content
@@ -96,19 +118,17 @@ class ProcessController(BaseController):
             if not text:
                 continue
 
-            metadata = page.metadata.copy()
-
-            self.logger.info("start using section_aware_splitter")
-
-            page_documents = self.process_section_aware_splitter(
-                text=text,
-                metadata=metadata,
-                chunk_size=chunk_size,
-                overlap_size=overlap_size
+            page_documents = (
+                self.process_section_aware_splitter(
+                    text=text,
+                    metadata=page.metadata.copy(),
+                    chunk_size=chunk_size,
+                    overlap_size=overlap_size
+                )
             )
 
             documents.extend(page_documents)
-        self.logger.info("file processed successfully")
+
         return documents
 
 
@@ -259,4 +279,101 @@ class ProcessController(BaseController):
             )
 
         return chunks
-    
+
+    async def process_pdf(
+    self,
+    file_id: str,
+    chunk_size: int = 1000,
+    overlap_size: int = 100
+):
+
+        file_path = os.path.join(
+            self.project_path,
+            file_id
+        )
+
+        table_detector = PDFTableDetector(
+            file_path=file_path
+        )
+
+        table_pages = table_detector.detect_table_pages()
+
+        self.logger.info(
+            f"Detected table pages: {table_pages}"
+        )
+
+        ocr_loader = OCRPDFLoader(
+            file_path=file_path,
+            excluded_pages=table_pages
+        )
+
+        normal_documents = ocr_loader.load()
+        self.logger.info(f"number of normal docs {len(normal_documents)}")
+
+        table_loader = TableLoader(
+            file_path=file_path,
+            dpi=150
+        )
+
+        table_documents = []
+
+        for page_number in table_pages:
+
+            image_path = table_loader.render_page(
+                page_number=page_number
+            )
+
+
+            text = ""
+
+            try:
+                text = await self.table_extractor.extract(
+                    image=image_path
+                )
+
+            finally:
+                if os.path.exists(image_path):
+                    os.unlink(image_path)
+
+            if not text.strip():
+                continue
+
+            table_documents.append(
+                Document(
+                    page_content=text,
+                    metadata={
+                        "page": page_number,
+                        "content_type": "table",
+                        "source": file_id
+                    }
+                )
+            )
+
+        # 4. Process normal text
+        documents = []
+
+        for page in normal_documents:
+
+            text = self.normalize_text(
+                page.page_content
+            )
+
+            if not text:
+                continue
+
+            page_documents = (
+                self.process_section_aware_splitter(
+                    text=text,
+                    metadata=page.metadata.copy(),
+                    chunk_size=chunk_size,
+                    overlap_size=overlap_size
+                )
+            )
+
+            documents.extend(page_documents)
+
+        # 5. Add tables
+        documents.extend(table_documents)
+
+        return documents
+                    
