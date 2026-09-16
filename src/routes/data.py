@@ -91,7 +91,7 @@ async def upload_data(request: Request, project_id: int, file: UploadFile,
 async def process_endpoint(request: Request, project_id: int, process_request: ProcessRequest):
 
      
-     process_controller = ProcessController(project_id=project_id)
+     process_controller = ProcessController(project_id=project_id, table_extractor=request.app.table_extractor)
      do_reset = process_request.do_reset
 
      project_model = await ProjectModel.create_instance(
@@ -181,7 +181,7 @@ async def process_endpoint(request: Request, project_id: int, process_request: P
 
      for asset_id, file_id in project_files_ids.items():  
 
-        file_chunks = process_controller.process_file_content(
+        file_chunks = await process_controller.process_file_content(
             file_id=file_id,
             chunk_size=process_request.chunk_size,
             overlap_size=process_request.overlap_size,

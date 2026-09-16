@@ -63,3 +63,28 @@ query_rewriter_prompt = Template("\n".join([
     "Standalone search query:",
 ]))
 
+
+vision_table_extractor_prompt = Template("\n".join([
+
+    "Extract the text contained in the table shown in the image.",
+
+    "",
+
+    "Rules:",
+
+    "- Extract all text contained in the table.",
+    "- Do not summarize the content.",
+    "- Do not answer any question.",
+    "- Do not add any information that is not present in the image.",
+    "- Do not invent or infer text that is unclear in the image.",
+    "- Preserve words and numbers as they appear in the image.",
+    "- Preserve the order of rows and columns.",
+    "- If a cell contains multiple lines, combine them into a single text.",
+    "- Return clear text suitable for use in a RAG pipeline.",
+
+    "",
+
+    "Extracted table text:",
+
+]))
+

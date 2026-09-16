@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from helpers import get_settings
 from routes import base_router, data_router, nlp_router
 from helpers import get_settings
-from stores import LLMProviderFactory, VectorDBProviderFactory, RerankerProviderFactory
+from stores import LLMProviderFactory, VectorDBProviderFactory, RerankerProviderFactory, TableExtractorFactory
 from stores.llm.templates import TemplateParser
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -66,6 +66,15 @@ async def startup_span():
     )
     app.reranker_client = reranker_provider_factory.create(
         provider=settings.RERANKER_BACKEND
+    )
+
+    # table extractor config
+    app.table_extractor_factory = TableExtractorFactory(
+        config=settings,
+        template_parser=app.template_parser
+    )
+    app.table_extractor = app.table_extractor_factory.create(
+        extractor_type=settings.TABLE_EXTRACTOR
     )
 
 
