@@ -14,9 +14,12 @@ class OCRDocument:
 
 class OCRPDFLoader:
 
-    def __init__(self, file_path: str, dpi: int = 300):
+    def __init__(self, file_path: str, dpi: int = 150, excluded_pages: list[int] | None = None):
         self.file_path = file_path
         self.dpi = dpi
+        self.excluded_pages = set(
+            excluded_pages or []
+        )
 
     def load(self):
 
@@ -32,6 +35,9 @@ class OCRPDFLoader:
         )
 
         for page_number, page in enumerate(pdf):
+
+            if page_number in self.excluded_pages:
+                continue
 
             pix = page.get_pixmap(
                 matrix=matrix,
