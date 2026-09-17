@@ -7,6 +7,7 @@ import re
 from models import ProcessingEnum
 import logging
 from typing import List
+import re
 from dataclasses import dataclass
 
 @dataclass
@@ -97,6 +98,14 @@ class ProcessController(BaseController):
     overlap_size: int = 100
 ):
 
+        base_metadata = {
+            "source": "قانون التأمينات الاجتماعية والمعاشات رقم 148 لسنة 2019",
+            "document_type": "law",
+            "law_number": "145",
+            "law_year": "2019",
+            "language": "ar",
+        }
+
         file_content = self.get_file_content(
             file_id=file_id
         )
@@ -109,7 +118,7 @@ class ProcessController(BaseController):
 
         documents = []
 
-        for page in file_content:
+        for idx, page in enumerate(file_content):
 
             text = self.normalize_text(
                 text=page.page_content
@@ -118,19 +127,123 @@ class ProcessController(BaseController):
             if not text:
                 continue
 
-            page_documents = (
-                self.process_section_aware_splitter(
-                    text=text,
-                    metadata=page.metadata.copy(),
-                    chunk_size=chunk_size,
-                    overlap_size=overlap_size
-                )
+            page_metadata = {
+                **base_metadata,
+                "page": idx + 1,
+                "content_type": "table",
+            }
+
+            page_documents = self.process_structured_splitter(
+                text=text,
+                metadata=page_metadata,
+                chunk_size=chunk_size,
+                overlap_size=overlap_size,
             )
 
             documents.extend(page_documents)
 
         return documents
 
+
+
+    def process_structured_splitter(
+    self,
+    text: str,
+    metadata: dict,
+    chunk_size: int = 1000,
+    overlap_size: int = 100
+):
+        documents = []
+
+        record_pattern = re.compile(r'(?=(?:السجل|الرمز):\s*\S+)')
+        blocks = [b.strip() for b in record_pattern.split(text) if b.strip()]
+
+        for block in blocks:
+            is_pure_table = re.search(r'\|.*\|', block) and '---' in block and not block.startswith(('السجل:', 'الرمز:'))
+
+            if is_pure_table:
+                for chunk_text in self._chunk_table_block(block, chunk_size):
+                    documents.append(Document(page_content=chunk_text.strip(), metadata=metadata.copy()))
+
+            elif block.startswith(('السجل:', 'الرمز:')):
+                if len(block) <= chunk_size:
+                    documents.append(Document(page_content=block, metadata=metadata.copy()))
+                else:
+                    for chunk_text in self._chunk_by_heading(block, chunk_size, overlap_size):
+                        documents.append(Document(page_content=chunk_text.strip(), metadata=metadata.copy()))
+            else:
+                for chunk_text in self._chunk_by_heading(block, chunk_size, overlap_size):
+                    documents.append(Document(page_content=chunk_text.strip(), metadata=metadata.copy()))
+
+        return documents
+
+
+    def _chunk_table_block(self, block: str, chunk_size: int):
+        lines = block.split('\n')
+        header_lines = []
+        row_lines = []
+        seen_separator = False
+
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            is_separator = bool(re.match(r'^\|?[\s\-:|]+\|?$', stripped)) and '-' in stripped
+            if is_separator:
+                header_lines.append(line)
+                seen_separator = True
+            elif seen_separator and stripped.startswith('|'):
+                row_lines.append(line)
+            else:
+                header_lines.append(line)
+
+        header = '\n'.join(header_lines)
+        chunks = []
+        current = header
+
+        for row in row_lines:
+            if len(current) + len(row) > chunk_size:
+                chunks.append(current)
+                current = header + '\n' + row
+            else:
+                current += '\n' + row
+
+        if current.strip() != header.strip():
+            chunks.append(current)
+
+        return chunks if chunks else [block]
+
+
+    def _chunk_by_heading(self, block: str, chunk_size: int, overlap_size: int):
+        heading_pattern = re.compile(
+            r'(?=(?:الباب|الفصل|القسم|العنوان)[^\n]*:)|(?=^#{1,3}\s)',
+            re.MULTILINE
+        )
+        sub_blocks = [sb.strip() for sb in heading_pattern.split(block) if sb.strip()]
+
+        result = []
+        for sb in sub_blocks:
+            if re.search(r'\|.*\|', sb) and '---' in sb:
+                result.extend(self._chunk_table_block(sb, chunk_size))
+            elif len(sb) <= chunk_size:
+                result.append(sb)
+            else:
+                result.extend(self._sliding_window(sb, chunk_size, overlap_size))
+        return result
+
+
+    def _sliding_window(self, text: str, chunk_size: int, overlap_size: int):
+        chunks = []
+        start = 0
+        n = len(text)
+        while start < n:
+            end = start + chunk_size
+            chunks.append(text[start:end])
+            new_start = end - overlap_size
+            if new_start <= start:
+                new_start = start + max(1, chunk_size)
+            start = new_start
+        return chunks
 
     def process_section_aware_splitter(
             self, 
@@ -287,6 +400,14 @@ class ProcessController(BaseController):
     overlap_size: int = 100
 ):
 
+        base_metadata = {
+            "source": "قانون التأمينات الاجتماعية والمعاشات رقم 148 لسنة 2019",
+            "document_type": "law",
+            "law_number": "148",
+            "law_year": "2019",
+            "language": "ar",
+        }
+
         file_path = os.path.join(
             self.project_path,
             file_id
@@ -342,9 +463,9 @@ class ProcessController(BaseController):
                 Document(
                     page_content=text,
                     metadata={
+                        **base_metadata,
                         "page": page_number,
                         "content_type": "table",
-                        "source": file_id
                     }
                 )
             )
@@ -352,7 +473,7 @@ class ProcessController(BaseController):
         # 4. Process normal text
         documents = []
 
-        for page in normal_documents:
+        for idx, page in enumerate(normal_documents):
 
             text = self.normalize_text(
                 page.page_content
@@ -364,7 +485,10 @@ class ProcessController(BaseController):
             page_documents = (
                 self.process_section_aware_splitter(
                     text=text,
-                    metadata=page.metadata.copy(),
+                    metadata={
+                        **base_metadata,
+                        "page": idx+1,
+                    },
                     chunk_size=chunk_size,
                     overlap_size=overlap_size
                 )
