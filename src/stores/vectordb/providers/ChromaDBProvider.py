@@ -3,6 +3,7 @@ from stores.vectordb.VectorDBEnums import DistanceMethodEnums
 from chromadb import PersistentClient
 from models.db_schemes import RetrievedDocument
 from rank_bm25 import BM25Okapi
+from helpers.metadata import FILTERABLE_METADATA
 import logging
 from typing import List
 import uuid
@@ -183,15 +184,24 @@ class ChromaDBProvider(VectorDBInterface):
 
      async def search_by_vector(self, collection_name: str,
                                       vector: list,
-                                      limit: int = 5) -> List[RetrievedDocument]:
+                                      limit: int = 5,
+                                      filters: dict | None = None,) -> List[RetrievedDocument]:
 
         collection = self.client.get_collection(
             name=collection_name
         )
 
+        if filters:
+            filters = {
+                key: value
+                for key, value in filters.items()
+                if key in FILTERABLE_METADATA
+            }
+
         results = collection.query(
             query_embeddings=[vector],
-            n_results=limit
+            n_results=limit,
+            where=filters if filters else None
         )
 
         if not results or not results["documents"]:
@@ -199,19 +209,23 @@ class ChromaDBProvider(VectorDBInterface):
 
         documents = results["documents"][0]
         distances = results["distances"][0]
+        metadatas = results["metadatas"][0]
 
         return [
-            RetrievedDocument(**{
-                "score": 1 - distance,
-                "text": document
-            })
-            for document, distance in zip(documents, distances)
+            RetrievedDocument(
+                score=1 - distance,
+                text=document,
+                metadata=metadata,
+            )
+            for document, distance, metadata
+            in zip(documents, distances, metadatas)
         ]
 
 
      async def search_by_keyword(self, collection_name: str,
                                         query: str,
-                                        limit: int
+                                        limit: int,
+                                        filters: dict | None = None,
       ) -> List[RetrievedDocument]:
 
         collection = self.client.get_collection(
