@@ -58,7 +58,8 @@ class VectorDBInterface(ABC):
     @abstractmethod
     async def search_by_vector(self, collection_name: str,
                                vector: list,
-                               limit: int) -> List[RetrievedDocument]:
+                               limit: int,
+                               filters: dict | None = None,) -> List[RetrievedDocument]:
         pass
 
     
@@ -68,7 +69,8 @@ class VectorDBInterface(ABC):
         self,
         collection_name: str,
         query: str,
-        limit: int
+        limit: int,
+        filters: dict | None = None,
     ) -> List[RetrievedDocument]:
         pass
 

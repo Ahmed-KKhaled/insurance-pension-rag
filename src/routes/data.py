@@ -11,6 +11,7 @@ from models import Chunk, Asset
 from models import AssetEnum
 from controllers import NLPController
 from models import MessageModel
+from .schemes.data import Asset_config
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -70,12 +71,12 @@ async def upload_data(request: Request, project_id: int, file: UploadFile,
             db_client=request.app.db_client
     )
     asset_resource = Asset(
-         asset_project_id = project.project_id,
-         asset_type = AssetEnum.FILE.value,
-         asset_name = file_id,
-         asset_size = os.path.getsize(file_path)
-
-    )
+    asset_project_id=project.project_id,
+    asset_type=AssetEnum.FILE.value,
+    asset_name=file_id,
+    asset_size=os.path.getsize(file_path),
+    asset_config=Asset_config
+)
     asset = await asset_model.insert_asset(asset=asset_resource)
 
 

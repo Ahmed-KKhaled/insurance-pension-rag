@@ -2,6 +2,8 @@ from qdrant_client import models, QdrantClient
 from ..VectorDBInterface import VectorDBInterface
 from ..VectorDBEnums import DistanceMethodEnums
 from models.db_schemes import RetrievedDocument
+from qdrant_client.models import Filter, FieldCondition, MatchValue
+from helpers.metadata import FILTERABLE_METADATA
 import logging
 from typing import List
 
@@ -167,27 +169,43 @@ class QdrantProvider(VectorDBInterface):
 
         return True
 
-    async def search_by_vector(self, collection_name: str, vector: list, limit: int = 5) -> List[RetrievedDocument]:
+    async def search_by_vector(self, collection_name: str, vector: list, limit: int = 5, filters: dict | None = None,) -> List[RetrievedDocument]:
 
         if vector and isinstance(vector[0], list):
             vector = vector[0]
+
+        query_filter = None
+
+        if filters:
+            query_filter = Filter(
+                must=[
+                    FieldCondition(
+                        key=key,
+                        match=MatchValue(value=str(value)),
+                    )
+                    for key, value in filters.items()
+                    if key in FILTERABLE_METADATA
+                ]
+            )
 
         responses = self.client.query_points(
             collection_name=collection_name,
             query=vector,
             using="dense",
+            query_filter=query_filter,
             limit=limit,
             with_payload=True
         )
 
         if not responses.points:
-            return None
+            return []
 
         return [
-            RetrievedDocument(**{
-                "score": point.score,
-                "text": point.payload.get("text") if point.payload else None
-            })
+            RetrievedDocument(
+                score=point.score,
+                text=point.payload.get("text") if point.payload else None,
+                metadata=point.payload,
+            )
             for point in responses.points
         ]
 
@@ -199,7 +217,8 @@ class QdrantProvider(VectorDBInterface):
     self,
     collection_name: str,
     query: str,
-    limit: int
+    limit: int,
+    filters: dict | None = None,
     ):
 
         results = self.client.query_points(

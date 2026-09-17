@@ -188,7 +188,7 @@ async def search_index(request: Request, project_id: int, search_request: Search
         message_model=message_model
     )
 
-   results = await nlp_controller.search_hybrid(
+   results, filters = await nlp_controller.search_hybrid(
         project=project,
         text=search_request.text,
         limit=search_request.reranker_limit
@@ -205,7 +205,8 @@ async def search_index(request: Request, project_id: int, search_request: Search
    return JSONResponse(
         content={
             "signal": ResponseSignal.VECTORDB_SEARCH_SUCCESS.value,
-            "results": [ result.dict()  for result in results ]
+            "results": [ result.dict()  for result in results ],
+            "filters": filters
         }
     )
 
@@ -244,7 +245,7 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
         return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={
-                    "signal": ResponseSignal.RAG_ANSWER_ERROR.value
+                    "signal": ResponseSignal.RAG_ANSWER_ERROR.value,
                 }
         )
     
@@ -300,7 +301,7 @@ async def chat( request: Request, project_id: int, chat_request: ChatRequest):
         message_model=message_model
     )
 
-    answer, full_prompt, retrieved_documents, chat_history, rewritten_query = (
+    answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters = (
         await nlp_controller.answer_chat_question(
             project=project,
             conversation=conversation,
@@ -314,7 +315,8 @@ async def chat( request: Request, project_id: int, chat_request: ChatRequest):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={
-                "signal": ResponseSignal.RAG_ANSWER_ERROR.value
+                "signal": ResponseSignal.RAG_ANSWER_ERROR.value,
+                "filters": filters
             }
         )
 
@@ -326,7 +328,8 @@ async def chat( request: Request, project_id: int, chat_request: ChatRequest):
             "full_prompt": full_prompt,
             "retrieved_documents": retrieved_documents,
             "chat_history" : chat_history,
-            "rewritten_query": rewritten_query
+            "rewritten_query": rewritten_query,
+            "filters": filters
         })
     )
 

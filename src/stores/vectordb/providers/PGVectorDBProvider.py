@@ -2,6 +2,7 @@ from ..VectorDBInterface import VectorDBInterface
 from stores.vectordb.VectorDBEnums import (PgVectorDistanceMetodEnums, PgVectorIndexTypeEnums,
                                             PgVectorTableSchemeEnums, DistanceMethodEnums)
 from models.db_schemes import RetrievedDocument
+from helpers.metadata import FILTERABLE_METADATA
 import logging
 from typing import List
 from sqlalchemy.sql import text as sql_text
@@ -385,7 +386,8 @@ class PGVectorProvider(VectorDBInterface):
 
     async def search_by_vector(self, collection_name: str,
                                    vector: list,
-                                   limit: int) -> List[RetrievedDocument]:
+                                   limit: int,
+                                   filters: dict | None = None,) -> List[RetrievedDocument]:
             
 
             is_collection_existed = await self.is_collection_existed(collection_name=collection_name)
@@ -398,13 +400,40 @@ class PGVectorProvider(VectorDBInterface):
 
             async with self.db_client() as session:
                     async with session.begin():
+                        conditions = []
+
+                        params = {
+                            "vector": vector,
+                            "limit": limit,
+                        }
+
+                        if filters:
+                            for index, (key, value) in enumerate(filters.items()):
+
+                                if key not in FILTERABLE_METADATA:
+                                    continue
+
+                                param_name = f"filter_{index}"
+
+                                conditions.append(
+                                    f"metadata->>'{key}' = :{param_name}"
+                                )
+
+                                params[param_name] = str(value)
+
+                        where_clause = ""
+
+                        if conditions:
+                            where_clause = "WHERE " + " AND ".join(conditions)
 
                         search_sql = sql_text(
                             f"""
                             SELECT
                                 {PgVectorTableSchemeEnums.TEXT.value} AS text,
+                                {PgVectorTableSchemeEnums.METADATA.value} AS metadata,
                                 1 - ({PgVectorTableSchemeEnums.VECTOR.value} <=> :vector) AS score
                             FROM {collection_name}
+                            {where_clause}
                             ORDER BY score DESC
                             LIMIT :limit
                             """
@@ -412,11 +441,7 @@ class PGVectorProvider(VectorDBInterface):
 
                         result = await session.execute(
                             search_sql,
-
-                            {
-                                "vector" : vector,
-                                "limit": limit
-                            }
+                            params
                         )
 
                         records = result.fetchall()
@@ -431,7 +456,8 @@ class PGVectorProvider(VectorDBInterface):
 
     async def search_by_keyword(self, collection_name: str,
                                       query: str,
-                                      limit: int
+                                      limit: int,
+                                      filters: dict | None = None,
     ) -> List[RetrievedDocument]:
 
         is_collection_existed = await self.is_collection_existed(collection_name=collection_name)
