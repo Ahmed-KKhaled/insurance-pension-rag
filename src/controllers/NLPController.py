@@ -6,6 +6,8 @@ from stores.llm.LLMEnums import DocumentTypeEnum
 from stores.vectordb.VectorDBEnums import PgVectorTableSchemeEnums
 import logging
 from models.db_schemes import RetrievedDocument
+from services.MetadataFilterExtractor import MetadataFilterExtractor
+from helpers.metadata import FILTERABLE_METADATA
 
 class NLPController(BaseController):
 
@@ -142,10 +144,21 @@ class NLPController(BaseController):
         if not query_vector:
             return []
 
+        #step3: extract metadata filters from user query
+        metadata_filter = MetadataFilterExtractor(
+            generation_client=self.generation_client,
+            template_parser=self.template_parser
+        )
+        filters = await metadata_filter.extract(
+            query=text,
+            available_fields=FILTERABLE_METADATA
+        )
+
         vector_results = await self.vectordb_client.search_by_vector(
             collection_name=collection_name,
             vector=query_vector,
-            limit=limit
+            limit=limit,
+            filters=filters
         )
 
         keyword_results = await self.vectordb_client.search_by_keyword(
@@ -158,7 +171,7 @@ class NLPController(BaseController):
             vector_results=vector_results,
             keyword_results=keyword_results,
             limit=limit
-        )
+        ), filters
 
     def merge_results(
             self,
@@ -218,14 +231,20 @@ class NLPController(BaseController):
         answer, full_prompt = None, None
 
         # 1) retrieve related documents
-        retrieved_documents = await self.search_hybrid(
+        retrieved_documents, filters = await self.search_hybrid(
             project=project,
             text=query,
             limit=retrieval_limit
         )
+        
+        print("retrieved_documents type:", type(retrieved_documents))
+        print("retrieved_documents:", retrieved_documents)
+
+        for document in retrieved_documents:
+            print("document type:", type(document))
 
         if not retrieved_documents or len(retrieved_documents) == 0:
-            return answer, full_prompt, chat_history, []
+            return answer, full_prompt, chat_history, [], filters
 
 
         # 2) Rerank retrieved documents
@@ -286,7 +305,7 @@ class NLPController(BaseController):
 
         self.logger.info(f"Generated answer: {answer!r}")
 
-        return answer, full_prompt, chat_history, retrieved_documents
+        return answer, full_prompt, chat_history, retrieved_documents, filters
 
 
     def build_chat_history(self, messages: list):
@@ -370,7 +389,7 @@ class NLPController(BaseController):
         
 
         # 3. Run RAG
-        answer, full_prompt, _, retrieved_documents = (
+        answer, full_prompt, _, retrieved_documents, filters = (
             await self.answer_rag_questions(
                 project=project,
                 query=rewritten_query,
@@ -381,7 +400,7 @@ class NLPController(BaseController):
         )
 
         if not answer:
-            return None, full_prompt, retrieved_documents, chat_history
+            return answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters
 
         # 4. Save user message
         user_message = Message(
@@ -405,4 +424,4 @@ class NLPController(BaseController):
             message=assistant_message
         )
 
-        return answer, full_prompt, retrieved_documents, chat_history, rewritten_query
+        return answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters
