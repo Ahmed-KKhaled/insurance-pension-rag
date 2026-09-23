@@ -8,6 +8,7 @@ import logging
 from models.db_schemes import RetrievedDocument
 from services.MetadataFilterExtractor import MetadataFilterExtractor
 from helpers.metadata import FILTERABLE_METADATA
+from .enums.nlp import ProcessControllerEnums
 
 class NLPController(BaseController):
 
@@ -149,7 +150,7 @@ class NLPController(BaseController):
             generation_client=self.generation_client,
             template_parser=self.template_parser
         )
-        filters = await metadata_filter.extract(
+        filters =  metadata_filter.extract(
             query=text,
             available_fields=FILTERABLE_METADATA
         )
@@ -236,14 +237,10 @@ class NLPController(BaseController):
             text=query,
             limit=retrieval_limit
         )
-        
-        print("retrieved_documents type:", type(retrieved_documents))
-        print("retrieved_documents:", retrieved_documents)
-
-        for document in retrieved_documents:
-            print("document type:", type(document))
 
         if not retrieved_documents or len(retrieved_documents) == 0:
+            answer = ProcessControllerEnums.ANSWER.value
+            
             return answer, full_prompt, chat_history, [], filters
 
 
