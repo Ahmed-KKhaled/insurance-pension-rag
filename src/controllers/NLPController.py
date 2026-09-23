@@ -11,6 +11,7 @@ from services.SummaryMemory import SummaryMemory
 from helpers.metadata import FILTERABLE_METADATA
 from .enums.nlp import ProcessControllerEnums
 from models.ConversationModel import ConversationModel
+from services.PromptInjuction import PromptInjectionDetector
 
 class NLPController(BaseController):
 
@@ -33,8 +34,13 @@ class NLPController(BaseController):
         self.message_model = message_model
         self.conversation_model = conversation_model
         self.ligthweigth_client=ligthweigth_client
+
         self.summary_model = SummaryMemory(
-            generation_client=self.generation_client,
+            generation_client=self.ligthweigth_client,
+            template_parser=self.template_parser
+        )
+        self.prompt_injuction = PromptInjectionDetector(
+            generation_client=self.ligthweigth_client,
             template_parser=self.template_parser
         )
         self.logger = logging.getLogger("uvicorn")
@@ -134,6 +140,25 @@ class NLPController(BaseController):
 
         return results
 
+    def validate_metadata_filters(
+    self,
+    filters: dict,
+    allowed_values: dict,
+) -> dict:
+
+        if not isinstance(filters, dict):
+            return {}
+
+        for field, value in filters.items():
+
+            if field not in allowed_values:
+                return {}
+
+            if value not in allowed_values[field]:
+                return {}
+
+        return filters
+
     async def search_hybrid(
         self,
         project: Project,
@@ -165,10 +190,10 @@ class NLPController(BaseController):
             available_fields=FILTERABLE_METADATA
         )
 
-        for field, allowed_values in ProcessControllerEnums.ALLOWED_METADATA_VALUES.value.items():
-            if field in filters and filters[field] not in allowed_values:
-                filters = {}
-                break
+        filters = self.validate_metadata_filters(
+            filters=filters,
+            allowed_values=ProcessControllerEnums.ALLOWED_METADATA_VALUES.value,
+        )
 
         
 
@@ -256,7 +281,7 @@ class NLPController(BaseController):
         )
 
         if not retrieved_documents or len(retrieved_documents) == 0:
-            answer = ProcessControllerEnums.ANSWER.value
+            answer = ProcessControllerEnums.NO_AVAILABLE_DOCUMENT_ANSWER.value
             
             return answer, full_prompt, chat_history, [], filters
 
@@ -365,6 +390,26 @@ class NLPController(BaseController):
     query: str,
     limit: int = 10,
     retrieval_limit: int = 20):
+
+
+        result = self.prompt_injuction.detect(query=query)
+
+        if result["is_injection"]:
+            self.logger.warning(
+                "Prompt injection detected: %s",
+                result.get("reason"),
+            )
+
+            return (
+                ProcessControllerEnums.PORMPT_INJUCTED_ANSWER.value,
+                None,
+                [],
+                [],
+                query,
+                {},
+            )
+
+
 
         # 1. Load previous messages
         messages = await self.message_model.get_messages_by_conversation_id(
