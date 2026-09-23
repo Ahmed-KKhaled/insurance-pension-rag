@@ -48,7 +48,8 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
         embedding_client=request.app.embedding_client,
         template_parser=request.app.template_parser,
         reranker_client=request.app.reranker_client,
-        message_model=message_model
+        message_model=message_model,
+        ligthweigth_client=request.app.ligthweigth_client 
     )
 
     has_records = True
@@ -143,7 +144,8 @@ async def get_project_index_info(request: Request, project_id: int):
         embedding_client=request.app.embedding_client,
         template_parser=request.app.template_parser,
         reranker_client=request.app.reranker_client,
-        message_model=message_model
+        message_model=message_model,
+        ligthweigth_client=request.app.ligthweigth_client 
     )
 
     collection_info = await nlp_controller.get_vector_collection_info(
@@ -181,11 +183,12 @@ async def search_index(request: Request, project_id: int, search_request: Search
     
    nlp_controller = NLPController(
         vectordb_client=request.app.vectordb_client,
-        generation_client=request.app.generation_client,
+        generation_client=request.app.ligthweigth_client,
         embedding_client=request.app.embedding_client,
         template_parser=request.app.template_parser,
         reranker_client=request.app.reranker_client,
-        message_model=message_model
+        message_model=message_model,
+        ligthweigth_client=request.app.ligthweigth_client 
     )
 
    results, filters = await nlp_controller.search_hybrid(
@@ -231,7 +234,8 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
         embedding_client=request.app.embedding_client,
         template_parser=request.app.template_parser,
         reranker_client=request.app.reranker_client,
-        message_model=message_model
+        message_model=message_model,
+        ligthweigth_client=request.app.ligthweigth_client 
     )
 
     answer, full_prompt, chat_history, retreived_documents = await nlp_controller.answer_rag_questions(
@@ -298,7 +302,8 @@ async def chat( request: Request, project_id: int, chat_request: ChatRequest):
         embedding_client=request.app.embedding_client,
         template_parser=request.app.template_parser,
         reranker_client=request.app.reranker_client,
-        message_model=message_model
+        message_model=message_model,
+        ligthweigth_client=request.app.ligthweigth_client 
     )
 
     answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters = (
