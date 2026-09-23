@@ -16,3 +16,8 @@ class ProcessControllerEnums(Enum):
         "law_year": "2019",
         "language": "ar",
     }
+
+    ALLOWED_METADATA_VALUES = {
+        "law_number": {"148"},
+        "law_year": {"2019"},
+    }
