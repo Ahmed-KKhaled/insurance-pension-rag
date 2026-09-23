@@ -46,6 +46,7 @@ dependencies = [
     "accelerate>=1.15.0",
     "protobuf<6",
     "google-genai>=2.25.0",
+    "ollama>=0.6.2",
 ]
 
 [project.scripts]

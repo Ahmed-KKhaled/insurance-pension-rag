@@ -41,6 +41,9 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
             db_client=request.app.db_client
         )
 
+    conversation_model = await ConversationModel.create_instance(
+                 db_client=request.app.db_client
+             )
     
     nlp_controller = NLPController(
         vectordb_client=request.app.vectordb_client,
@@ -49,7 +52,8 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
         template_parser=request.app.template_parser,
         reranker_client=request.app.reranker_client,
         message_model=message_model,
-        ligthweigth_client=request.app.ligthweigth_client 
+        ligthweigth_client=request.app.ligthweigth_client ,
+        conversation_model=conversation_model
     )
 
     has_records = True
@@ -137,6 +141,10 @@ async def get_project_index_info(request: Request, project_id: int):
             db_client=request.app.db_client
         )
 
+    conversation_model = await ConversationModel.create_instance(
+                 db_client=request.app.db_client
+             )
+
     
     nlp_controller = NLPController(
         vectordb_client=request.app.vectordb_client,
@@ -145,7 +153,8 @@ async def get_project_index_info(request: Request, project_id: int):
         template_parser=request.app.template_parser,
         reranker_client=request.app.reranker_client,
         message_model=message_model,
-        ligthweigth_client=request.app.ligthweigth_client 
+        ligthweigth_client=request.app.ligthweigth_client,
+        conversation_model=conversation_model 
     )
 
     collection_info = await nlp_controller.get_vector_collection_info(
@@ -180,6 +189,10 @@ async def search_index(request: Request, project_id: int, search_request: Search
            db_client=request.app.db_client
        )
 
+   conversation_model = await ConversationModel.create_instance(
+                db_client=request.app.db_client
+            )
+
     
    nlp_controller = NLPController(
         vectordb_client=request.app.vectordb_client,
@@ -188,7 +201,8 @@ async def search_index(request: Request, project_id: int, search_request: Search
         template_parser=request.app.template_parser,
         reranker_client=request.app.reranker_client,
         message_model=message_model,
-        ligthweigth_client=request.app.ligthweigth_client 
+        ligthweigth_client=request.app.ligthweigth_client ,
+        conversation_model=conversation_model
     )
 
    results, filters = await nlp_controller.search_hybrid(
@@ -228,6 +242,10 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
             db_client=request.app.db_client
     )
 
+    conversation_model = await ConversationModel.create_instance(
+        db_client=request.app.db_client
+    )
+
     nlp_controller = NLPController(
         vectordb_client=request.app.vectordb_client,
         generation_client=request.app.generation_client,
@@ -235,7 +253,8 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
         template_parser=request.app.template_parser,
         reranker_client=request.app.reranker_client,
         message_model=message_model,
-        ligthweigth_client=request.app.ligthweigth_client 
+        ligthweigth_client=request.app.ligthweigth_client,
+        conversation_model=conversation_model
     )
 
     answer, full_prompt, chat_history, retreived_documents = await nlp_controller.answer_rag_questions(
@@ -303,7 +322,8 @@ async def chat( request: Request, project_id: int, chat_request: ChatRequest):
         template_parser=request.app.template_parser,
         reranker_client=request.app.reranker_client,
         message_model=message_model,
-        ligthweigth_client=request.app.ligthweigth_client 
+        ligthweigth_client=request.app.ligthweigth_client,
+        conversation_model=conversation_model 
     )
 
     answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters = (
