@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     COHERE_API_KEY: str=None
     GEMINI_API_KEY: str=None
     GROQ_API_KEY: str=None
+    OPENROUTER_API_KEY: str=None
+    OPENROUTER_BASE_URL:str = "https://openrouter.ai/api/v1"
+    OLLAMA_HOST: str=None
 
     GENERATION_MODEL_ID: str=None
     EMBEDDING_MODEL_ID: str=None
@@ -52,7 +55,7 @@ class Settings(BaseSettings):
     RERANKER_MAX_LENGTH: int=8192
 
     VISION_MODEL_ID: str
-    TABLE_EXTRACTOR: str
+    VISION_BACKEND: str
 
     class Config:
         env_file=".env"
