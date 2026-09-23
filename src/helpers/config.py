@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     GENERATION_BACKEND_LITERAL: List[str]=None
     GENERATION_BACKEND: str
+    LIGHTWEIGHT_GENERATION_MODEL: str
     EMBEDDING_BACKEND_LITERAL: List[str]=None
     EMBEDDING_BACKEND: str
 
