@@ -17,7 +17,8 @@ class NLPController(BaseController):
                        embedding_client,
                        template_parser,
                        reranker_client,
-                       message_model):
+                       message_model,
+                       ligthweigth_client):
         
         super().__init__()
 
@@ -27,6 +28,7 @@ class NLPController(BaseController):
         self.template_parser = template_parser
         self.reranker_client = reranker_client
         self.message_model = message_model
+        self.ligthweigth_client=ligthweigth_client
         self.logger = logging.getLogger("uvicorn")
 
 
@@ -147,7 +149,7 @@ class NLPController(BaseController):
 
         #step3: extract metadata filters from user query
         metadata_filter = MetadataFilterExtractor(
-            generation_client=self.generation_client,
+            generation_client=self.ligthweigth_client,
             template_parser=self.template_parser
         )
         filters =  metadata_filter.extract(
@@ -366,30 +368,28 @@ class NLPController(BaseController):
             messages=messages
         )
 
-        if messages:
-            # For query rewriting
-            rewrite_history = self.build_rewrite_history(
-                messages=messages
-            )
 
-            query_rewriter_prompt = self.template_parser.get(
-                        group="rag",
-                        key="query_rewriter_prompt",
-                        vars={
-                            "chat_history" : rewrite_history,
-                            "query" : query
-                        }
-            )
+        # For query rewriting
+        rewrite_history = self.build_rewrite_history(
+            messages=messages
+        )
 
-            rewritten_query = self.generation_client.generate_text(
-                prompt=query_rewriter_prompt,
-                chat_history=[]
-            )
+        query_rewriter_prompt = self.template_parser.get(
+                    group="rag",
+                    key="query_rewriter_prompt",
+                    vars={
+                        "chat_history" : rewrite_history,
+                        "query" : query
+                    }
+        )
 
-            rewritten_query = rewritten_query.strip()
+        rewritten_query = self.ligthweigth_client.generate_text(
+            prompt=query_rewriter_prompt,
+            chat_history=[]
+        )
 
-        else:
-            rewritten_query=query
+        rewritten_query = rewritten_query.strip()
+
         
 
         # 3. Run RAG
