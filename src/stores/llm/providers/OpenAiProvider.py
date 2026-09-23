@@ -127,11 +127,3 @@ class OpenAiProvider(LLMInterface):
              "content" : prompt
         }
 
-            
-
-        
-
-
-
-
-        
