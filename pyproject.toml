@@ -45,6 +45,7 @@ dependencies = [
     "torchvision>=0.23.0",
     "accelerate>=1.15.0",
     "protobuf<6",
+    "google-genai>=2.25.0",
 ]
 
 [project.scripts]

@@ -6,6 +6,8 @@ class LLMEnums(Enum):
     COHERE = "COHERE"
     HUGGINGFACE = "HUGGINGFACE"
     SENTENCE_TRANSFORMER = "SENTENCE_TRANSFORMER" 
+    OPEN_ROUTER="OPEN_ROUTER"
+    GEMINI="GEMINI"
 
 
 class OpenAIEnums(Enum):
@@ -23,6 +25,16 @@ class CohereEnums(Enum):
     QUERY = "search_query"
 
 class HuggingfaceEnum(Enum):
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
+
+class OpenRouterEnum(Enum):
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
+
+class GeminiEnums(Enum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"

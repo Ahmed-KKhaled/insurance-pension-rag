@@ -39,6 +39,14 @@ async def startup_span():
         model_id=settings.GENERATION_MODEL_ID
     )
 
+    # Metadata filter client
+    app.ligthweigth_client = llm_provider_factory.create(
+        provider=settings.GENERATION_BACKEND
+    )
+    app.ligthweigth_client.set_generation_model(
+        model_id=settings.LIGHTWEIGHT_GENERATION_MODEL
+    )
+
     # Embedding client
     app.embedding_client = llm_provider_factory.create(
         provider=settings.EMBEDDING_BACKEND
