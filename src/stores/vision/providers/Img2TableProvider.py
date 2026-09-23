@@ -1,11 +1,11 @@
 from img2table.document import Image as TableImage
 from img2table.ocr import TesseractOCR
-from ..TableExtractorInterface import TableExtractorInterface
+from ..VisionInterface import VisionInterface
 
 
-class Img2TableProvider(TableExtractorInterface):
+class Img2TableProvider(VisionInterface):
 
-    def __init__(self, model_id: str=None, template_parser: None=None):
+    def __init__(self, model_id: str=None, template_parser: None=None, ollama_host:str=None, api_key: str=None, base_url: str=None):
         self.ocr = TesseractOCR(
             n_threads=1,
             lang="ara"

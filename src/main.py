@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from helpers import get_settings
 from routes import base_router, data_router, nlp_router
 from helpers import get_settings
-from stores import LLMProviderFactory, VectorDBProviderFactory, RerankerProviderFactory, TableExtractorFactory
+from stores import LLMProviderFactory, VectorDBProviderFactory, RerankerProviderFactory, VisionFactory
 from stores.llm.templates import TemplateParser
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -69,12 +69,12 @@ async def startup_span():
     )
 
     # table extractor config
-    app.table_extractor_factory = TableExtractorFactory(
+    app.vision_factory = VisionFactory(
         config=settings,
-        template_parser=app.template_parser
+        template_parser=app.template_parser,
     )
-    app.table_extractor = app.table_extractor_factory.create(
-        extractor_type=settings.TABLE_EXTRACTOR
+    app.vision_model = app.vision_factory.create(
+        provider=settings.VISION_BACKEND
     )
 
 

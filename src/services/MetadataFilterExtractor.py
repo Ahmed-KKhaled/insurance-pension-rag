@@ -9,7 +9,7 @@ class MetadataFilterExtractor:
         self.template_parser = template_parser
         self.logger = logging.getLogger("uvicorn.error")
 
-    async def extract(
+    def extract(
         self,
         query: str,
         available_fields: list[str]
@@ -29,15 +29,17 @@ class MetadataFilterExtractor:
                 prompt=metadata_filter_extractor_prompt
             )
 
-            response = response.strip()
+            self.logger.info(
+                f"Metadata raw response: {repr(response)}"
+            )
 
-            if response.startswith("```json"):
-                response = response[7:]
+            response = response.strip() if response else ""
 
-            if response.endswith("```"):
-                response = response[:-3]
-
-            response = response.strip()
+            if not response:
+                self.logger.warning(
+                    "Metadata generation returned an empty response"
+                )
+                return {}
 
             result = json.loads(response)
 

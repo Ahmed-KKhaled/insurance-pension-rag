@@ -5,6 +5,7 @@ from langchain_community.document_loaders import TextLoader
 from .loaders import OCRPDFLoader, PDFTableDetector, TableLoader
 import re
 from models import ProcessingEnum
+from .enums.nlp import ProcessControllerEnums
 import logging
 from typing import List
 import re
@@ -16,13 +17,13 @@ class Document:
     metadata: dict
 
 class ProcessController(BaseController):
-    def __init__(self, project_id: str, table_extractor):
+    def __init__(self, project_id: str, vision_model):
         super().__init__()
 
         self.project_id = project_id
         self.project_path = ProjectController().get_project_path(project_id=project_id)
         self.logger = logging.getLogger("uvicorn.error")
-        self.table_extractor = table_extractor
+        self.vision_model = vision_model
 
 
     def get_file_extension(self, file_id: str):
@@ -98,13 +99,7 @@ class ProcessController(BaseController):
     overlap_size: int = 100
 ):
 
-        base_metadata = {
-            "source": "قانون التأمينات الاجتماعية والمعاشات رقم 148 لسنة 2019",
-            "document_type": "law",
-            "law_number": "145",
-            "law_year": "2019",
-            "language": "ar",
-        }
+        base_metadata = ProcessControllerEnums.base_metadata.value
 
         file_content = self.get_file_content(
             file_id=file_id
@@ -133,16 +128,104 @@ class ProcessController(BaseController):
                 "content_type": "table",
             }
 
-            page_documents = self.process_structured_splitter(
-                text=text,
-                metadata=page_metadata,
-                chunk_size=chunk_size,
-                overlap_size=overlap_size,
-            )
+
+
+            sections = self.split_by_official_gazette(text)
+
+            page_documents = []
+
+            for section_title, section_text in sections:
+
+                section_metadata = page_metadata.copy()
+                section_metadata["gazette_issue"] = section_title
+
+                section_chunks = self._chunk_gazette_section(
+                    section_title=section_title,
+                    section_text=section_text,
+                    chunk_size=chunk_size,
+                )
+
+                for chunk in section_chunks:
+                    page_documents.append(
+                        Document(
+                            page_content=chunk,
+                            metadata=section_metadata.copy(),
+                        )
+                    )
 
             documents.extend(page_documents)
 
         return documents
+
+
+    def split_by_official_gazette(self, text: str):
+        pattern = re.compile(
+            r"(?=الجريدة\s+الرسمية\s*[-–—]\s*"
+            r"العدد\s+\d+\s+مكرر"
+            r"(?:\s*\([^)]+\))?"
+            r"\s+في\s+\d+\s+"
+            r"(?:يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر)"
+            r"\s+سنة\s+\d{4})"
+        )
+
+        matches = list(pattern.finditer(text))
+
+        if not matches:
+            return [("unknown", text)]
+
+        sections = []
+
+        for index, match in enumerate(matches):
+            start = match.start()
+
+            if index + 1 < len(matches):
+                end = matches[index + 1].start()
+            else:
+                end = len(text)
+
+            section_text = text[start:end].strip()
+
+            if section_text:
+                sections.append(
+                    (
+                        match.group().strip(),
+                        section_text
+                    )
+                )
+
+        return sections
+
+
+    def _chunk_gazette_section(
+    self,
+    section_title: str,
+    section_text: str,
+    chunk_size: int,
+):
+        # Remove the title from the section body
+        body = section_text[len(section_title):].strip()
+
+        # Reserve space for the title
+        available_size = chunk_size - len(section_title) - 1
+
+        if available_size <= 0:
+            raise ValueError(
+                "chunk_size is too small for the gazette header."
+            )
+
+        chunks = []
+
+        start = 0
+        while start < len(body):
+            body_chunk = body[start:start + available_size]
+
+            chunk = f"{section_title}\n{body_chunk}"
+
+            chunks.append(chunk)
+
+            start += available_size
+
+        return chunks
 
 
 
@@ -246,7 +329,7 @@ class ProcessController(BaseController):
         return chunks
 
     def process_section_aware_splitter(
-            self, 
+            self,
             text: str,
             metadata: dict,
             chunk_size: int,
@@ -254,7 +337,7 @@ class ProcessController(BaseController):
     ):
 
         self.logger.info("start split_by_articles")
-        
+
         sections = self.split_by_articles(text)
 
         chunks = []
@@ -397,7 +480,7 @@ class ProcessController(BaseController):
     self,
     file_id: str,
     chunk_size: int = 1000,
-    overlap_size: int = 100
+    overlap_size: int = 100,
 ):
 
         base_metadata = {
@@ -438,37 +521,60 @@ class ProcessController(BaseController):
 
         table_documents = []
 
-        for page_number in table_pages:
+        # Process each table page individually
+         for page_number in table_pages:
 
-            image_path = table_loader.render_page(
-                page_number=page_number
-            )
+             image_path = None
 
+             try:
 
-            text = ""
+                 self.logger.info(
+                     f"Starting vision page: {page_number}"
+                 )
 
-            try:
-                text = await self.table_extractor.extract(
-                    image=image_path
-                )
+                 image_path = table_loader.render_page(
+                     page_number=page_number
+                 )
 
-            finally:
-                if os.path.exists(image_path):
-                    os.unlink(image_path)
+                 self.logger.info(
+                     f"Rendered page: {page_number}"
+                 )
 
-            if not text.strip():
-                continue
+                 texts = await self.vision_model.extract(
+                     images=[image_path]
+                 )
 
-            table_documents.append(
-                Document(
-                    page_content=text,
-                    metadata={
-                        **base_metadata,
-                        "page": page_number,
-                        "content_type": "table",
-                    }
-                )
-            )
+                 text = texts[0] if texts else ""
+
+                 self.logger.info(
+                     f"Vision extraction finished for page: {page_number}"
+                 )
+
+                 if not text.strip():
+                     continue
+
+                 table_documents.append(
+                   Document(
+                         page_content=text,
+                         metadata={
+                             **base_metadata,
+                             "page": page_number,
+                             "content_type": "table",
+                         },
+                     )
+                 )
+
+             except Exception as e:
+
+                 self.logger.error(
+                     f"Error processing page {page_number}: {e}",
+                     exc_info=True,
+                 )
+
+             finally:
+
+                 if image_path and os.path.exists(image_path):
+                     os.unlink(image_path)
 
         # 4. Process normal text
         documents = []
@@ -500,4 +606,4 @@ class ProcessController(BaseController):
         documents.extend(table_documents)
 
         return documents
-                    
+    
