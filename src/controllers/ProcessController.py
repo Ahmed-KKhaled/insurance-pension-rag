@@ -522,7 +522,7 @@ class ProcessController(BaseController):
         table_documents = []
 
         # Process each table page individually
-         for page_number in table_pages:
+        for page_number in table_pages:
 
              image_path = None
 
