@@ -31,7 +31,7 @@ class OpenAiProvider(LLMInterface):
         )
 
         self.enums = OpenAIEnums
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger("uvicorn.error")
 
 
 
