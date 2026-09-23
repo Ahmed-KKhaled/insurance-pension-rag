@@ -155,6 +155,13 @@ class NLPController(BaseController):
             available_fields=FILTERABLE_METADATA
         )
 
+        for field, allowed_values in ProcessControllerEnums.ALLOWED_METADATA_VALUES.value.items():
+            if field in filters and filters[field] not in allowed_values:
+                filters = {}
+                break
+
+        
+
         vector_results = await self.vectordb_client.search_by_vector(
             collection_name=collection_name,
             vector=query_vector,
