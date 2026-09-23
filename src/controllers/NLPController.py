@@ -7,8 +7,10 @@ from stores.vectordb.VectorDBEnums import PgVectorTableSchemeEnums
 import logging
 from models.db_schemes import RetrievedDocument
 from services.MetadataFilterExtractor import MetadataFilterExtractor
+from services.SummaryMemory import SummaryMemory
 from helpers.metadata import FILTERABLE_METADATA
 from .enums.nlp import ProcessControllerEnums
+from models.ConversationModel import ConversationModel
 
 class NLPController(BaseController):
 
@@ -18,6 +20,7 @@ class NLPController(BaseController):
                        template_parser,
                        reranker_client,
                        message_model,
+                       conversation_model,
                        ligthweigth_client):
         
         super().__init__()
@@ -28,7 +31,12 @@ class NLPController(BaseController):
         self.template_parser = template_parser
         self.reranker_client = reranker_client
         self.message_model = message_model
+        self.conversation_model = conversation_model
         self.ligthweigth_client=ligthweigth_client
+        self.summary_model = SummaryMemory(
+            generation_client=self.generation_client,
+            template_parser=self.template_parser
+        )
         self.logger = logging.getLogger("uvicorn")
 
 
@@ -260,7 +268,7 @@ class NLPController(BaseController):
         )
 
         if not reranked_documents or len(reranked_documents) == 0:
-            return answer, full_prompt, chat_history, []
+            return answer, full_prompt, chat_history, [], filters
 
         # 3) Keep only the top-k reranked documents
         retrieved_documents = reranked_documents[:limit]
@@ -363,7 +371,10 @@ class NLPController(BaseController):
             conversation_id=conversation.conversation_id,
         )
 
-        # 2. Convert DB messages to LLM chat history
+        # 2. Get previous conversation summary
+        previous_summary = conversation.summary or ""
+
+        # 3. Convert DB messages to LLM chat history
         chat_history = self.build_chat_history(
             messages=messages
         )
@@ -379,6 +390,7 @@ class NLPController(BaseController):
                     key="query_rewriter_prompt",
                     vars={
                         "chat_history" : rewrite_history,
+                        "previous_summary":previous_summary,
                         "query" : query
                     }
         )
@@ -388,11 +400,15 @@ class NLPController(BaseController):
             chat_history=[]
         )
 
+        if not rewritten_query:
+            rewritten_query=query
+
+
         rewritten_query = rewritten_query.strip()
 
         
 
-        # 3. Run RAG
+        # 4. Run RAG
         answer, full_prompt, _, retrieved_documents, filters = (
             await self.answer_rag_questions(
                 project=project,
@@ -406,7 +422,7 @@ class NLPController(BaseController):
         if not answer:
             return answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters
 
-        # 4. Save user message
+        # 5. Save user message
         user_message = Message(
             role=self.generation_client.enums.USER.value,
             content=query,
@@ -417,7 +433,7 @@ class NLPController(BaseController):
             message=user_message
         )
 
-        # 5. Save assistant message
+        # 6. Save assistant message
         assistant_message = Message(
             role=self.generation_client.enums.ASSISTANT.value,
             content=answer,
@@ -427,5 +443,38 @@ class NLPController(BaseController):
         await self.message_model.insert_message(
             message=assistant_message
         )
+
+        # 7. Load messages again after saving the new turn
+        updated_messages = (
+            await self.message_model.get_messages_by_conversation_id(
+                conversation_id=conversation.conversation_id,
+            )
+        )
+
+        # 8. Check if it's time to generate a new summary
+        message_count = len(updated_messages)
+
+        if message_count > 0 and message_count % 6 == 0:
+
+            # Get only the latest 6 messages
+            recent_messages = updated_messages[-6:]
+
+            # Convert recent messages to text
+            recent_history = self.build_rewrite_history(
+                messages=recent_history
+            )
+
+            # 9. Generate updated rolling summary
+            new_summary = self.summary_model.summarize(
+                conversation=recent_history,
+                previous_summary=previous_summary
+            )
+
+            # 10. Save the updated summary
+            await self.conversation_model.update_summary(
+                conversation_id=conversation.conversation_id,
+                summary=new_summary
+            )
+
 
         return answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters
