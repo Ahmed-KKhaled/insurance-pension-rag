@@ -3,7 +3,7 @@ from enum import Enum
 
 class ProcessControllerEnums(Enum):
 
-    ANSWER = (
+    NO_AVAILABLE_DOCUMENT_ANSWER = (
         "عذرًا، لا تتوفر في المستندات المتاحة معلومات كافية "
         "للإجابة عن هذا السؤال بدقة. "
         "يرجى إعادة صياغة السؤال أو تقديم مزيد من التفاصيل."
@@ -21,3 +21,5 @@ class ProcessControllerEnums(Enum):
         "law_number": {"148"},
         "law_year": {"2019"},
     }
+
+    PORMPT_INJUCTED_ANSWER = "عذرًا، لا يمكنني معالجة هذا الطلب."
