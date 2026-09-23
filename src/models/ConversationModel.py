@@ -161,4 +161,29 @@ class ConversationModel(BaseDataModel):
                   records_count = await session.execute(count_sql)
     
                   return records_count.scalar_one()
-    
+
+    async def update_summary(
+    self,
+    conversation_id: int,
+    summary: str,
+):
+        async with self.db_client() as session:
+            async with session.begin():
+
+                search_stmt = select(Conversation).where(
+                    Conversation.conversation_id == conversation_id
+                )
+
+                result = await session.execute(search_stmt)
+                conversation = result.scalar_one_or_none()
+
+                if conversation is None:
+                    raise ValueError(
+                        f"Conversation {conversation_id} not found."
+                    )
+
+                conversation.summary = summary
+
+            await session.refresh(conversation)
+
+        return conversation
