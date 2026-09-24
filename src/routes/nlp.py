@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, status, Request
+from fastapi import FastAPI, APIRouter, status, Request, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from .schemes import PushRequest, SearchRequest, ChatRequest
@@ -8,6 +8,8 @@ from controllers import NLPController
 from models.Enums import ResponseSignal
 import logging
 from tqdm.auto import tqdm
+from typing import Optional
+from uuid import UUID
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -53,7 +55,8 @@ async def index_project(request: Request, project_id: int, push_request: PushReq
         reranker_client=request.app.reranker_client,
         message_model=message_model,
         ligthweigth_client=request.app.ligthweigth_client ,
-        conversation_model=conversation_model
+        conversation_model=conversation_model,
+        vision_client=request.app.vision_client 
     )
 
     has_records = True
@@ -154,7 +157,8 @@ async def get_project_index_info(request: Request, project_id: int):
         reranker_client=request.app.reranker_client,
         message_model=message_model,
         ligthweigth_client=request.app.ligthweigth_client,
-        conversation_model=conversation_model 
+        conversation_model=conversation_model ,
+        vision_client=request.app.vision_client 
     )
 
     collection_info = await nlp_controller.get_vector_collection_info(
@@ -202,7 +206,8 @@ async def search_index(request: Request, project_id: int, search_request: Search
         reranker_client=request.app.reranker_client,
         message_model=message_model,
         ligthweigth_client=request.app.ligthweigth_client ,
-        conversation_model=conversation_model
+        conversation_model=conversation_model,
+        vision_client=request.app.vision_client 
     )
 
    results, filters = await nlp_controller.search_hybrid(
@@ -254,7 +259,8 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
         reranker_client=request.app.reranker_client,
         message_model=message_model,
         ligthweigth_client=request.app.ligthweigth_client,
-        conversation_model=conversation_model
+        conversation_model=conversation_model,
+        vision_client=request.app.vision_client 
     )
 
     answer, full_prompt, chat_history, retreived_documents = await nlp_controller.answer_rag_questions(
@@ -283,7 +289,26 @@ async def answer_rag(request: Request, project_id: int, search_request: SearchRe
 )
 
 @nlp_router.post("/chat/{project_id}")
-async def chat( request: Request, project_id: int, chat_request: ChatRequest):
+async def chat(
+    request: Request,
+    project_id: int,
+
+    text: str = Form(...),
+    conversation_uuid: Optional[UUID] = Form(None),
+    limit: int = Form(10),
+    reranker_limit: int = Form(20),
+    title: Optional[str] = Form("New conversation"),
+
+    image: UploadFile | None = File(None),
+):
+
+    chat_request = ChatRequest(
+        text=text,
+        conversation_uuid=conversation_uuid,
+        limit=limit,
+        reranker_limit=reranker_limit,
+        title=title,
+    )
 
     project_model = await ProjectModel.create_instance(
     db_client=request.app.db_client
@@ -323,7 +348,8 @@ async def chat( request: Request, project_id: int, chat_request: ChatRequest):
         reranker_client=request.app.reranker_client,
         message_model=message_model,
         ligthweigth_client=request.app.ligthweigth_client,
-        conversation_model=conversation_model 
+        conversation_model=conversation_model,
+        vision_client=request.app.vision_client 
     )
 
     answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters = (
@@ -331,6 +357,7 @@ async def chat( request: Request, project_id: int, chat_request: ChatRequest):
             project=project,
             conversation=conversation,
             query=chat_request.text,
+            image=image,
             retrieval_limit=chat_request.reranker_limit,
             limit=chat_request.limit
         )
