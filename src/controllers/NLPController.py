@@ -12,6 +12,10 @@ from helpers.metadata import FILTERABLE_METADATA
 from .enums.nlp import ProcessControllerEnums
 from models.ConversationModel import ConversationModel
 from services.PromptInjuction import PromptInjectionDetector
+from fastapi import UploadFile
+import os
+import tempfile
+from pathlib import Path
 
 class NLPController(BaseController):
 
@@ -22,7 +26,8 @@ class NLPController(BaseController):
                        reranker_client,
                        message_model,
                        conversation_model,
-                       ligthweigth_client):
+                       ligthweigth_client,
+                       vision_client):
         
         super().__init__()
 
@@ -34,6 +39,7 @@ class NLPController(BaseController):
         self.message_model = message_model
         self.conversation_model = conversation_model
         self.ligthweigth_client=ligthweigth_client
+        self.vision_client = vision_client
 
         self.summary_model = SummaryMemory(
             generation_client=self.ligthweigth_client,
@@ -406,16 +412,70 @@ class NLPController(BaseController):
 
         return "\n".join(history)
 
+
+    async def extract_image_context(
+        self,
+        image: UploadFile
+    ) -> str:
+
+        suffix = Path(
+            image.filename or ""
+        ).suffix or ".png"
+
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=suffix
+        ) as temp_file:
+
+            temp_file.write(
+                await image.read()
+            )
+
+            image_path = temp_file.name
+
+        try:
+            vision_context = (
+                await self.vision_client.extract_text_from_image(
+                    image=image_path
+                )
+            )
+
+            return vision_context
+
+        finally:
+            os.remove(image_path)
+        
+
     async def answer_chat_question(
     self,
     project: Project,
     conversation,
     query: str,
+    image: UploadFile | None = None,
     limit: int = 10,
     retrieval_limit: int = 20):
 
+        vision_context = ""
 
-        result = self.prompt_injuction.detect(query=query)
+        if image:
+            vision_context = await self.extract_image_context(image=image)
+
+        self.logger.info(
+            f"Generated description {vision_context}"
+        )
+
+        rewrite_query = query
+
+        if vision_context:
+            rewrite_query = f"""
+                سؤال المستخدم:
+                {query}
+
+                محتوى الصورة:
+                {vision_context}
+                """.strip()
+
+        result = self.prompt_injuction.detect(query=rewrite_query)
 
         if result["is_injection"]:
             self.logger.warning(
@@ -459,7 +519,7 @@ class NLPController(BaseController):
                     vars={
                         "chat_history" : rewrite_history,
                         "previous_summary":previous_summary,
-                        "query" : query
+                        "query" : rewrite_query
                     }
         )
 
