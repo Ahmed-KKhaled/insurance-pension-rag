@@ -81,7 +81,7 @@ async def startup_span():
         config=settings,
         template_parser=app.template_parser,
     )
-    app.vision_model = app.vision_factory.create(
+    app.vision_client = app.vision_factory.create(
         provider=settings.VISION_BACKEND
     )
 
