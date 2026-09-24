@@ -164,7 +164,8 @@ async def process_endpoint(request: Request, project_id: int, process_request: P
              reranker_client=request.app.reranker_client,
              message_model=message_model,
              ligthweigth_client=request.app.ligthweigth_client,
-             conversation_model=conversation_model
+             conversation_model=conversation_model,
+             vision_client=request.app.vision_client 
      )
 
      if do_reset:
