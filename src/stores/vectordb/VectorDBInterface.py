@@ -74,5 +74,16 @@ class VectorDBInterface(ABC):
     ) -> List[RetrievedDocument]:
         pass
 
+    @abstractmethod
+    async def search_by_numeric(
+        self,
+        collection_name: str,
+        query: str,
+        limit: int,
+        filters: dict | None = None,
+    ) -> List[RetrievedDocument]:
+        pass
+
+
 
 
