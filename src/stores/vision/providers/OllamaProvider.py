@@ -1,7 +1,7 @@
 from ollama import AsyncClient
 
 from ..VisionInterface import VisionInterface
-
+import base64, httpx
 
 class OllamaProvider(VisionInterface):
 
@@ -21,7 +21,7 @@ class OllamaProvider(VisionInterface):
             host=ollama_host
         )
 
-    async def extract(self, image: str) -> str:
+    async def extract_text_from_table(self, image: str) -> str:
 
         vision_table_extractor_prompt = self.template_parser.get(
             group="rag",
@@ -34,6 +34,28 @@ class OllamaProvider(VisionInterface):
                 {
                     "role": "user",
                     "content": vision_table_extractor_prompt,
+                    "images": [image],
+                }
+            ],
+            think=False
+        )
+
+        return response["message"]["content"].strip()
+
+
+    async def extract_text_from_image(self, image: str) -> str:
+
+        vision_image_extractor_prompt = self.template_parser.get(
+            group="rag",
+            key="vision_image_extractor_prompt",
+        )
+
+        response = await self.client.chat(
+            model=self.model_id,
+            messages=[
+                {
+                    "role": "user",
+                    "content": vision_image_extractor_prompt,
                     "images": [image],
                 }
             ],

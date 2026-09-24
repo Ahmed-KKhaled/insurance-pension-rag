@@ -51,3 +51,6 @@ class Img2TableProvider(VisionInterface):
                     extracted_text.append(" | ".join(cells))
 
         return "\n".join(extracted_text)
+
+    async def extract_text_from_image(self, image: str) -> str:
+            raise NotImplementedError
