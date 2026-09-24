@@ -7,6 +7,7 @@ import logging
 from typing import List
 from sqlalchemy.sql import text as sql_text
 import json
+import re
 
 class PGVectorProvider(VectorDBInterface):
 
@@ -380,10 +381,8 @@ class PGVectorProvider(VectorDBInterface):
 
 
             return True
-                
 
     
-
     async def search_by_vector(self, collection_name: str,
                                    vector: list,
                                    limit: int,
@@ -453,37 +452,74 @@ class PGVectorProvider(VectorDBInterface):
                 )
                 for record in records
             ]
+                
 
-    async def search_by_keyword(self, collection_name: str,
-                                      query: str,
-                                      limit: int,
-                                      filters: dict | None = None,
-    ) -> List[RetrievedDocument]:
+    
+
+    async def search_by_keyword(
+    self,
+    collection_name: str,
+    query: str,
+    limit: int,
+    filters: dict | None = None,
+) -> List[RetrievedDocument]:
 
         is_collection_existed = await self.is_collection_existed(collection_name=collection_name)
-         
+
         if not is_collection_existed:
-            self.logger.error(f"Can not search into a non-existed collection: {collection_name}")
+            self.logger.error(
+                f"Can not search into a non-existed collection: {collection_name}"
+            )
             return []
 
-
         async with self.db_client() as session:
-             async with session.begin():
+            async with session.begin():
+
+                conditions = [
+                    f"""
+                    to_tsvector(
+                        'simple',
+                        {PgVectorTableSchemeEnums.TEXT.value}
+                    )
+                    @@ plainto_tsquery('simple', :query)
+                    """
+                ]
+
+                params = {
+                    "query": query,
+                    "limit": limit,
+                }
+
+                if filters:
+                    for index, (key, value) in enumerate(filters.items()):
+
+                        if key not in FILTERABLE_METADATA:
+                            continue
+
+                        param_name = f"filter_{index}"
+
+                        conditions.append(
+                            f"metadata->>'{key}' = :{param_name}"
+                        )
+
+                        params[param_name] = str(value)
+
+                where_clause = " AND ".join(conditions)
 
                 search_sql = sql_text(
                     f"""
                     SELECT
                         {PgVectorTableSchemeEnums.TEXT.value} AS text,
+                        {PgVectorTableSchemeEnums.METADATA.value} AS metadata,
                         ts_rank(
-                            to_tsvector('simple', {PgVectorTableSchemeEnums.TEXT.value}),
+                            to_tsvector(
+                                'simple',
+                                {PgVectorTableSchemeEnums.TEXT.value}
+                            ),
                             plainto_tsquery('simple', :query)
                         ) AS score
                     FROM {collection_name}
-                    WHERE to_tsvector(
-                        'simple',
-                        {PgVectorTableSchemeEnums.TEXT.value}
-                    )
-                    @@ plainto_tsquery('simple', :query)
+                    WHERE {where_clause}
                     ORDER BY score DESC
                     LIMIT :limit
                     """
@@ -491,10 +527,7 @@ class PGVectorProvider(VectorDBInterface):
 
                 result = await session.execute(
                     search_sql,
-                    {
-                        "query": query,
-                        "limit": limit
-                    }
+                    params
                 )
 
                 records = result.fetchall()
@@ -506,7 +539,131 @@ class PGVectorProvider(VectorDBInterface):
             )
             for record in records
         ]
-                
+
+
+
+
+    async def search_by_numeric(
+            self,
+            collection_name: str,
+            query: str,
+            limit: int,
+            filters: dict | None = None,
+        ) -> List[RetrievedDocument]:
+
+        is_collection_existed = await self.is_collection_existed(
+            collection_name=collection_name
+        )
+
+        if not is_collection_existed:
+            self.logger.error(
+                f"Can not search into a non-existed collection: {collection_name}"
+            )
+            return []
+
+        # Extract numeric tokens from query
+        numbers = re.findall(r"(?<!\d)\d+(?!\d)", query)
+
+        if not numbers:
+            return []
+
+        async with self.db_client() as session:
+            async with session.begin():
+
+                conditions = []
+                params = {
+                    "limit": limit,
+                }
+
+                # Build numeric matching conditions
+                numeric_conditions = []
+
+                for index, number in enumerate(numbers):
+
+                    param_name = f"number_{index}"
+
+                    numeric_conditions.append(
+                        f"""
+                        {PgVectorTableSchemeEnums.TEXT.value}
+                        ~ ('(^|[^0-9])' || :{param_name} || '([^0-9]|$)')
+                        """
+                    )
+
+                    params[param_name] = number
+
+                conditions.append(
+                    "(" + " OR ".join(numeric_conditions) + ")"
+                )
+
+                # Metadata filters
+                if filters:
+                    for index, (key, value) in enumerate(filters.items()):
+
+                        if key not in FILTERABLE_METADATA:
+                            continue
+
+                        param_name = f"filter_{index}"
+
+                        conditions.append(
+                            f"metadata->>'{key}' = :{param_name}"
+                        )
+
+                        params[param_name] = str(value)
+
+                where_clause = " AND ".join(conditions)
+
+                # Score = number of matched numeric tokens
+                score_expressions = []
+
+                for index, _ in enumerate(numbers):
+
+                    param_name = f"number_{index}"
+
+                    score_expressions.append(
+                        f"""
+                        CASE
+                            WHEN {PgVectorTableSchemeEnums.TEXT.value}
+                            ~ ('(^|[^0-9])' || :{param_name} || '([^0-9]|$)')
+                            THEN 1
+                            ELSE 0
+                        END
+                        """
+                    )
+
+                score_expression = " + ".join(score_expressions)
+
+                search_sql = sql_text(
+                    f"""
+                    SELECT
+                        {PgVectorTableSchemeEnums.TEXT.value} AS text,
+                        {PgVectorTableSchemeEnums.METADATA.value} AS metadata,
+                        ({score_expression})::float AS score
+
+                    FROM {collection_name}
+
+                    WHERE {where_clause}
+
+                    ORDER BY score DESC
+
+                    LIMIT :limit
+                    """
+                )
+
+                result = await session.execute(
+                    search_sql,
+                    params
+                )
+
+                records = result.fetchall()
+
+        return [
+            RetrievedDocument(
+                text=record.text,
+                score=record.score,
+            )
+            for record in records
+        ]
+                    
 
             
                 
