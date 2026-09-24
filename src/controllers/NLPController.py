@@ -178,8 +178,8 @@ class NLPController(BaseController):
         )
 
         if not query_vector:
-            return []
-
+            return [], {}
+        
         #step3: extract metadata filters from user query
         metadata_filter = MetadataFilterExtractor(
             generation_client=self.ligthweigth_client,
@@ -207,19 +207,31 @@ class NLPController(BaseController):
         keyword_results = await self.vectordb_client.search_by_keyword(
             collection_name=collection_name,
             query=text,
-            limit=limit
+            limit=limit,
+            filters=filters
         )
 
-        return self.merge_results(
+        numeric_results = await self.vectordb_client.search_by_numeric(
+            collection_name=collection_name,
+            query=text,
+            limit=limit,
+            filters=filters,
+        )
+
+        merged_results = self.merge_results(
             vector_results=vector_results,
             keyword_results=keyword_results,
-            limit=limit
-        ), filters
+            numeric_results=numeric_results,
+            limit=limit,
+        )
+
+        return merged_results, filters
 
     def merge_results(
             self,
             vector_results: List[RetrievedDocument],
             keyword_results: List[RetrievedDocument],
+            numeric_results: List[RetrievedDocument],
             limit: int = 20,
             k: int = 60
         ) -> List[RetrievedDocument]:
@@ -247,6 +259,17 @@ class NLPController(BaseController):
                 scores[document_id] = scores.get(
                     document_id,
                     0
+                ) + (1 / (k + rank))
+
+            for rank, document in enumerate(numeric_results, start=1):
+
+                document_id = document.text
+
+                documents[document_id] = document
+
+                scores[document_id] = scores.get(
+                    document_id,
+                    0,
                 ) + (1 / (k + rank))
     
             ranked_documents = sorted(
