@@ -448,7 +448,9 @@ class PGVectorProvider(VectorDBInterface):
             return [
                 RetrievedDocument(
                     text=record.text,
-                    score=record.score
+                    score=record.score,
+                    source=record.metadata.get("source"),
+                    page=record.metadata.get("page")
                 )
                 for record in records
             ]
@@ -536,6 +538,8 @@ class PGVectorProvider(VectorDBInterface):
             RetrievedDocument(
                 text=record.text,
                 score=record.score,
+                source=record.metadata.get("source"),
+                page=record.metadata.get("page")
             )
             for record in records
         ]
@@ -660,6 +664,8 @@ class PGVectorProvider(VectorDBInterface):
             RetrievedDocument(
                 text=record.text,
                 score=record.score,
+                source=record.metadata.get("source"),
+                page=record.metadata.get("page")
             )
             for record in records
         ]
