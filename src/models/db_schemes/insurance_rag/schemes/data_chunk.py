@@ -40,4 +40,5 @@ class Chunk(SQLAlchemyBase):
 class RetrievedDocument(BaseModel):
     text: str
     score: float
-    metadata: dict | None = None
+    source: str | None = None
+    page: int | None = None

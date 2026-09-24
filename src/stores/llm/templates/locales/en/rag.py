@@ -13,6 +13,12 @@ system_prompt = Template("\n".join([
     "You have to generate response in the same language as the user's query.",
     "Be polite and respectful to the user.",
     "Be precise and concise in your response. Avoid unnecessary information.",
+
+    # Source & Page
+    "When using information from a document, you must include its source and page number.",
+    "Use the source and page number exactly as provided in the documents.",
+    "Do not invent, guess, modify, or fabricate any source or page number.",
+    "If you use information from multiple documents, include the source and page number for each document used.",
 ]))
 
 #### Document ####
@@ -20,12 +26,15 @@ document_prompt = Template(
     "\n".join([
         "## Document No: $doc_num",
         "### Content: $chunk_text",
+        "### Source and Page: $chunk_metadata",
     ])
 )
 
 #### Footer ####
 footer_prompt = Template("\n".join([
     "Based only on the above documents, please generate an answer for the user.",
+    "The answer must include the source and page number for each document used.",
+    "Do not mention any source or page number that is not provided in the documents.",
     "## Question:",
     "$query",
     "",

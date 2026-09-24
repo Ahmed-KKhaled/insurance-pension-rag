@@ -338,7 +338,11 @@ class NLPController(BaseController):
             key="document_prompt",
             vars={
                 "doc_num":idx + 1,
-                "chunk_text": doc.text
+                "chunk_text": doc.text,
+                "chunk_metadata": "\n".join([
+                    f"المصدر: {doc.source}",
+                    f"الصفحة: {doc.page}",
+                ]),
             }
         )  for idx, doc in  enumerate(retrieved_documents)])
 
@@ -460,9 +464,10 @@ class NLPController(BaseController):
         if image:
             vision_context = await self.extract_image_context(image=image)
 
-        self.logger.info(
-            f"Generated description {vision_context}"
-        )
+        if vision_context:
+            self.logger.info(
+                f"Generated description {vision_context}"
+            )
 
         rewrite_query = query
 
