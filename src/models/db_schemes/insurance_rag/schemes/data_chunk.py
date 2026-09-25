@@ -42,3 +42,4 @@ class RetrievedDocument(BaseModel):
     score: float
     source: str | None = None
     page: int | None = None
+    file_url: str | None = None
