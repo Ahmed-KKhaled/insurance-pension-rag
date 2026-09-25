@@ -289,6 +289,35 @@ class NLPController(BaseController):
                 for document_id, _ in ranked_documents[:limit]
             ]
 
+    def build_document_citation(self, document: RetrievedDocument) -> dict:
+        if not document.file_url:
+            return {
+                "source": document.source,
+                "page": document.page,
+                "url": None,
+                "label": (
+                    f"📄 {document.source}"
+                    f" — ص. {document.page}"
+                    if document.page
+                    else f"📄 {document.source}"
+                ),
+            }
+
+        url = document.file_url
+
+        if document.page:
+            url = f"{url}#page={document.page}"
+
+        return {
+            "source": document.source,
+            "page": document.page,
+            "url": url,
+            "label": (
+                f"📄 {document.source}"
+                f" — ص. {document.page}"
+            ),
+        }
+
 
     async def answer_rag_questions(self, project: Project,
                                          query: str,
@@ -312,7 +341,7 @@ class NLPController(BaseController):
         if not retrieved_documents or len(retrieved_documents) == 0:
             answer = ProcessControllerEnums.NO_AVAILABLE_DOCUMENT_ANSWER.value
             
-            return answer, full_prompt, chat_history, [], filters
+            return answer, full_prompt, chat_history, [], filters, []
 
 
         # 2) Rerank retrieved documents
@@ -326,6 +355,12 @@ class NLPController(BaseController):
 
         # 3) Keep only the top-k reranked documents
         retrieved_documents = reranked_documents[:limit]
+
+        # 4) Build citations
+        citations = [
+            self.build_document_citation(doc)
+            for doc in retrieved_documents
+        ]
 
         # 4) construct the llm prompt
         system_prompt = self.template_parser.get(
@@ -342,6 +377,7 @@ class NLPController(BaseController):
                 "chunk_metadata": "\n".join([
                     f"المصدر: {doc.source}",
                     f"الصفحة: {doc.page}",
+                    f"اللينك : {doc.file_url}"
                 ]),
             }
         )  for idx, doc in  enumerate(retrieved_documents)])
@@ -377,7 +413,7 @@ class NLPController(BaseController):
 
         self.logger.info(f"Generated answer: {answer!r}")
 
-        return answer, full_prompt, chat_history, retrieved_documents, filters
+        return answer, full_prompt, chat_history, retrieved_documents, filters, citations
 
 
     def build_chat_history(self, messages: list):
@@ -495,6 +531,7 @@ class NLPController(BaseController):
                 [],
                 query,
                 {},
+                []
             )
 
 
@@ -542,7 +579,7 @@ class NLPController(BaseController):
         
 
         # 4. Run RAG
-        answer, full_prompt, _, retrieved_documents, filters = (
+        answer, full_prompt, _, retrieved_documents, filters, citations = (
             await self.answer_rag_questions(
                 project=project,
                 query=rewritten_query,
@@ -553,7 +590,7 @@ class NLPController(BaseController):
         )
 
         if not answer:
-            return answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters
+            return answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters, citations
 
         # 5. Save user message
         user_message = Message(
@@ -610,4 +647,4 @@ class NLPController(BaseController):
             )
 
 
-        return answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters
+        return answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters, citations

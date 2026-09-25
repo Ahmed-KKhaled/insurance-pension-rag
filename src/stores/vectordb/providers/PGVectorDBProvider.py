@@ -450,7 +450,8 @@ class PGVectorProvider(VectorDBInterface):
                     text=record.text,
                     score=record.score,
                     source=record.metadata.get("source"),
-                    page=record.metadata.get("page")
+                    page=record.metadata.get("page"),
+                    file_url=record.metadata.get("file_url")
                 )
                 for record in records
             ]
@@ -539,7 +540,8 @@ class PGVectorProvider(VectorDBInterface):
                 text=record.text,
                 score=record.score,
                 source=record.metadata.get("source"),
-                page=record.metadata.get("page")
+                page=record.metadata.get("page"),
+                file_url=record.metadata.get("file_url")
             )
             for record in records
         ]
@@ -665,7 +667,8 @@ class PGVectorProvider(VectorDBInterface):
                 text=record.text,
                 score=record.score,
                 source=record.metadata.get("source"),
-                page=record.metadata.get("page")
+                page=record.metadata.get("page"),
+                file_url=record.metadata.get("file_url")
             )
             for record in records
         ]
