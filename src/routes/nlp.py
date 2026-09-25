@@ -352,7 +352,7 @@ async def chat(
         vision_client=request.app.vision_client 
     )
 
-    answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters = (
+    answer, full_prompt, retrieved_documents, chat_history, rewritten_query, filters, citations = (
         await nlp_controller.answer_chat_question(
             project=project,
             conversation=conversation,
@@ -381,7 +381,8 @@ async def chat(
             "retrieved_documents": retrieved_documents,
             "chat_history" : chat_history,
             "rewritten_query": rewritten_query,
-            "filters": filters
+            "filters": filters,
+            "citations":citations
         })
     )
 
